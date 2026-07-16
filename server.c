@@ -1,3 +1,6 @@
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -5,6 +8,8 @@
 int main(int argc, char *argv[]) {
   while (1) {
 
+    htons(uint32_t hostlong);
+    ntohs(uint16_t netshort);
     connect(int fd, const struct sockaddr *addr, socklen_t len);
     send(int fd, const void *buf, size_t n, int flags);
     recv(int fd, void *buf, size_t n, int flags);
