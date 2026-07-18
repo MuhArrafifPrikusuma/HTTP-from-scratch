@@ -135,3 +135,44 @@ struct in_addr sin_addr; // Internet address
 unsigned char sin_zero[8] // same size as sockaddr / will be zeroed with memset()
 };
 ```
+
+this struct makes it easy to reference elements of the socket address.
+
+```
+// (IPv4 only)
+struct in_addr {
+uint32_t s_addr; // 32 Bits for IPv4 address here
+}
+```
+
+```
+// (IPv6 only)
+struct sockaddr_in6 {
+u_int16_t sin6_family; // address family, AF_INET6
+u_int16_t sin6_port; // port, Network byte order
+u_int32_t sin6_flowinfo; // IPv6 flow information
+struct in6_addr sin6_addr; // IPv6 address
+u_int32_t sin6_scope_id; // Scope ID
+}
+
+structi n6_addr {
+unsigned char s6_addr[16]; IPv6 address
+}
+```
+
+```
+// this one is support for both IPv6 and IPv4
+struct sockaddr_storage {
+    sa_family_t  ss_family;     // address family
+
+    // all this is padding, implementation specific, ignore it:
+    char      __ss_pad1[_SS_PAD1SIZE];
+    int64_t   __ss_align;
+    char      __ss_pad2[_SS_PAD2SIZE];
+};
+```
+
+you can do it by casting type that i want to ss_family by using AF_INET or AF_INET6
+NOTE: all that structs above has it's glibc linux header
+
+## IP Addresses, Part Two

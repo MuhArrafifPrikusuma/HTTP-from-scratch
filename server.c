@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <bits/sockaddr.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
