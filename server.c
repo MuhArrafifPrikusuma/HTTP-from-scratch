@@ -9,6 +9,7 @@
 int main(int argc, char *argv[]) {
   while (1) {
 
+    inet_pton(int af, const char *restrict cp, void *restrict buf);
     htons(uint32_t hostlong);
     ntohs(uint16_t netshort);
     connect(int fd, const struct sockaddr *addr, socklen_t len);

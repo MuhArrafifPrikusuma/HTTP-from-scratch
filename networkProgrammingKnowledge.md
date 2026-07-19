@@ -176,3 +176,14 @@ you can do it by casting type that i want to ss_family by using AF_INET or AF_IN
 NOTE: all that structs above has it's glibc linux header
 
 ## IP Addresses, Part Two
+
+There are alot of functions to help with IP addresses for example:
+
+```
+// convert IP addresses into their binary notation
+// and you can use this for Both IPv4 and IPv6
+inet_pton();
+pton stands for presentation network because it presents Network address to the machine
+```
+
+### Private Or Disconnected Networks
