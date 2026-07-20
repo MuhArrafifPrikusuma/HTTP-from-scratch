@@ -187,3 +187,7 @@ pton stands for presentation network because it presents Network address to the 
 ```
 
 ### Private Or Disconnected Networks
+
+Ref to:
+https://beej.us/guide/bgnet/html/split/ip-addresses-structs-and-data-munging.html
+at Y: BOT
