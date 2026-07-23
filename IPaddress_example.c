@@ -34,10 +34,21 @@ int main(int argc, char *argv[]) {
 
   // the dns from arg will be taken and then build a linked list in res with the
   // template from hints and paste the IP addresses found to ai_addr
-  if ((status = getaddrinfo(argv[1], NULL, &hints, &res)) != 0) {
+  if ((status = getaddrinfo(argv[1], "3490", &hints, &res)) != 0) {
     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
     exit(status);
   }
+  // this will return index to be used to sent system call to an open socket
+  int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  if (sockfd == -1)
+    fprintf(stderr, "socket is not working hmph!\n");
+
+  int bindret = bind(sockfd, res->ai_addr, res->ai_addrlen);
+  if (bindret == -1) {
+    fprintf(stderr, "HMPHH! bind also broken\n");
+    // exit(bindret);
+  }
+  printf("this what bind returns to me: %d\n", bindret);
 
   printf("IP addresses for %s:\n", argv[1]);
 
@@ -69,6 +80,7 @@ int main(int argc, char *argv[]) {
   }
   // this will iterate through the linked list freeing all value
   freeaddrinfo(res);
+  printf("the protocol is %d\n", sockfd);
 
   return EXIT_SUCCESS;
 }
