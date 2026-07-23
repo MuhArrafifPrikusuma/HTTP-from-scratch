@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <asm-generic/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdbool.h>
@@ -37,6 +38,10 @@ int main(int argc, char *argv[]) {
     sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
     if (sockfd == -1)
       continue;
+    int yes = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes) == -1)
+      perror("setsockopt");
+
     if (connect(sockfd, p->ai_addr, p->ai_addrlen) == 0) {
       if (p->ai_family == AF_INET) {
         IPv4 = (struct sockaddr_in *)p->ai_addr;
@@ -47,11 +52,12 @@ int main(int argc, char *argv[]) {
       }
 
       inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
+      sleep(1);
       connect_any = true;
       printf("Successfully connect to %s\n", ipstr);
       fflush(stdout);
       close(sockfd);
-      sleep(1);
+      sockfd = -1;
       continue;
     }
 
