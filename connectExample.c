@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
 
-  if ((status = getaddrinfo(argv[1], "3490", &hints, &res)) != 0) {
+  if ((status = getaddrinfo(argv[1], "hello", &hints, &res)) != 0) {
     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
     return EXIT_FAILURE;
   }
@@ -36,8 +36,10 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in6 *IPv6;
 
     sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-    if (sockfd == -1)
+    if (sockfd == -1) {
+      perror("failed to connect");
       continue;
+    }
     int yes = 1;
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes) == -1)
       perror("setsockopt");
