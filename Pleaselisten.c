@@ -1,5 +1,4 @@
 #include <arpa/inet.h>
-#include <asm-generic/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdbool.h>
@@ -67,20 +66,75 @@ int main(int argc, char *argv[]) {
   }
 
   if (listen(sockfd, BACKLOG) == -1) {
+  error_while_listen:
     perror("listen");
     close(sockfd);
     return EXIT_FAILURE;
   }
   printf("Server: listening to %s\nport: %s\n", ipstr, MYPORT);
 
-  addr_size = sizeof(their_addr);
-  new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &addr_size);
-  if (new_fd == -1) {
-    perror("accept");
-    close(sockfd);
-    return EXIT_FAILURE;
+  while (1) {
+
+    addr_size = sizeof(their_addr);
+    new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &addr_size);
+    if (new_fd == -1) {
+      perror("accept");
+      close(sockfd);
+      continue;
+    }
+
+    int len;
+
+    char bufrecv[2048];
+    memset(bufrecv, 0, sizeof(bufrecv));
+
+    len = sizeof(bufrecv);
+    int bytes_recv;
+    if ((bytes_recv = recv(new_fd, bufrecv, len - 1, 0)) <= 0) {
+      if (bytes_recv < 0)
+        perror("recv");
+      close(new_fd);
+      continue;
+    }
+
+    char method[16] = {0};
+    char path[256] = {0};
+
+    // split bufrecv and put them to method and path
+    sscanf(bufrecv, "%15s %255s", method, path);
+
+    printf("Received request: %s %s\n", method, path);
+
+    char body[512];
+    if (strcmp(path, "/") == 0) {
+      snprintf(body, sizeof(body), "Welcome to the homepage!\n");
+    } else if (strcmp(path, "/hello") == 0) {
+      snprintf(body, sizeof(body), "Hello Human! i am server!\n");
+    } else if (strcmp(path, "/health") == 0) {
+      snprintf(body, sizeof(body), "Server status: Running and Healthy!\n");
+    } else {
+      snprintf(body, sizeof(body), "404 Error: path '%s' not found!\n", path);
+    }
+
+    char response[1024];
+    int response_len =
+        snprintf(response, sizeof(response),
+                 "HTTP/1.1 %s\r\n"
+                 "Content-Type: text/plain\r\n"
+                 "Content-Length: %zu\r\n"
+                 "Connection: close\r\n"
+                 "\r\n"
+                 "%s",
+                 (strcmp(path, "/") == 0 || strcmp(path, "/hello") == 0 ||
+                  strcmp(path, "/health") == 0)
+                     ? "200 OK"
+                     : "404 Not Found",
+                 strlen(body), body);
+
+    if (send(new_fd, response, response_len, 0) == -1)
+      continue;
+    close(new_fd);
   }
-  printf("Connection accepted!\n");
 
   close(new_fd);
   close(sockfd);
