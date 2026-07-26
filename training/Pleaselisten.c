@@ -9,10 +9,10 @@
 #include <unistd.h>
 
 #define MYPORT "8080"
-#define BACKLOG 10
+#define BACKLOG 10 // <- max number of pending connection
 
 int main(int argc, char *argv[]) {
-  struct sockaddr_storage their_addr;
+  struct sockaddr_storage their_addr; // <- store addr from sender
   struct addrinfo hints, *res, *p;
   socklen_t addr_size;
   int status;
@@ -62,15 +62,18 @@ int main(int argc, char *argv[]) {
   }
   if (p == NULL) {
     fprintf(stderr, "server: failed to bind\n");
+    freeaddrinfo(res);
     return EXIT_FAILURE;
   }
 
   if (listen(sockfd, BACKLOG) == -1) {
-  error_while_listen:
     perror("listen");
     close(sockfd);
+    freeaddrinfo(res);
     return EXIT_FAILURE;
   }
+
+  freeaddrinfo(res);
   printf("Server: listening to %s\nport: %s\n", ipstr, MYPORT);
 
   while (1) {
@@ -79,7 +82,6 @@ int main(int argc, char *argv[]) {
     new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &addr_size);
     if (new_fd == -1) {
       perror("accept");
-      close(sockfd);
       continue;
     }
 
@@ -103,7 +105,7 @@ int main(int argc, char *argv[]) {
     // split bufrecv and put them to method and path
     sscanf(bufrecv, "%15s %255s", method, path);
 
-    printf("Received request: %s %s\n", method, path);
+    printf("Received request: %s %s from %s\n", method, path, ipstr);
 
     char body[512];
     if (strcmp(path, "/") == 0) {
@@ -112,6 +114,8 @@ int main(int argc, char *argv[]) {
       snprintf(body, sizeof(body), "Hello Human! i am server!\n");
     } else if (strcmp(path, "/health") == 0) {
       snprintf(body, sizeof(body), "Server status: Running and Healthy!\n");
+    } else if (strcmp(path, "/check") == 0) {
+      snprintf(body, sizeof(body), "What are you looking for?\n");
     } else {
       snprintf(body, sizeof(body), "404 Error: path '%s' not found!\n", path);
     }
@@ -126,7 +130,7 @@ int main(int argc, char *argv[]) {
                  "\r\n"
                  "%s",
                  (strcmp(path, "/") == 0 || strcmp(path, "/hello") == 0 ||
-                  strcmp(path, "/health") == 0)
+                  strcmp(path, "/health") == 0 || strcmp(path, "/check") == 0)
                      ? "200 OK"
                      : "404 Not Found",
                  strlen(body), body);

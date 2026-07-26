@@ -19,11 +19,6 @@ int main(int argc, char *argv[]) {
   // act as a buffer for presentation string
   char ipstr[INET6_ADDRSTRLEN];
 
-  if (argc != 2) {
-    fprintf(stderr, "you need to tell me what's the adddress is idiot\n");
-    exit(1);
-  }
-
   // so it doesn't read any stupid garbage data
   memset(&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC;
