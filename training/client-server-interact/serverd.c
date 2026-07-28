@@ -21,6 +21,7 @@ void sigchld_handler(int s) {
   // we save errno to not interupt global scope while maintaining the last errno
   // value before anything changed it in main
   int saved_errno = errno;
+  char mesg[] = "Child process terminated\n";
 
   // wait for all child process and if they have finished then we close it and
   // WNOHANG is used to return immediately if there is no child process, and btw
@@ -29,7 +30,7 @@ void sigchld_handler(int s) {
   // be terminated(it will immediately return 0 if there is no child process
   // that were terminated)
   while (waitpid(-1, NULL, WNOHANG) > 0)
-    ;
+    write(STDOUT_FILENO, mesg, sizeof(mesg) - 1);
 
   errno = saved_errno;
 }
