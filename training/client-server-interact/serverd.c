@@ -11,8 +11,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define PORT "6666"
 #define BACKLOG 20
+char *PORT = "8080";
 
 void sigchld_handler(int s) {
   (void)s; // this was sent by linux SIGCHLD and not actually needed since this
@@ -51,6 +51,8 @@ int main(int argc, char *argv[]) {
   int yes = 1;
   char str[INET6_ADDRSTRLEN];
   int status;
+  // this thing dangerous find a better way later
+  PORT = (argc > 1) ? argv[1] : PORT;
 
   memset(&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC;
@@ -141,7 +143,6 @@ int main(int argc, char *argv[]) {
       close(new_fd);
       _exit(0); // <- always use exit for child process
     }
-    close(new_fd);
   }
 
   return EXIT_SUCCESS;
