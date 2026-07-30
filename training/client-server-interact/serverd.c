@@ -125,8 +125,8 @@ int main(int argc, char *argv[]) {
   printf("server: waiting for connection...\n");
   signal_Handler(&sa, SIGCHLD);
 
-  sin_size = sizeof recvr_addr;
   while (1) {
+
     sin_size = sizeof recvr_addr;
     new_fd =
         connect_to_client(sockfd, (struct sockaddr *)&recvr_addr, &sin_size);
