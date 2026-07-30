@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (listen(sockfd, BACKLOG) == -1) {
+  error_while_listen:
     perror("listen");
     close(sockfd);
     freeaddrinfo(res);
@@ -105,7 +106,7 @@ int main(int argc, char *argv[]) {
     // split bufrecv and put them to method and path
     sscanf(bufrecv, "%15s %255s", method, path);
 
-    printf("Received request: %s %s from %s\n", method, path, ipstr);
+    printf("Received request: %s %s\n", method, path);
 
     char body[512];
     if (strcmp(path, "/") == 0) {

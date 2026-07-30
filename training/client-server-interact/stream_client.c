@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+// FIX: this bullshit always fails on IPv6
 #define MAXRECVDATA 100 // <- 100 bytes
 char *PORT;
 char *DEST_ADDRESS;
