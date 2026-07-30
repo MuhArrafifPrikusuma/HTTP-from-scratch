@@ -3,6 +3,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,28 +12,45 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define BACKLOG 20
-char *PORT = "8080";
+#define BACKLOG 100
+char *PORT;
 
-void sigchld_handler(int s) {
-  (void)s; // this was sent by linux SIGCHLD and not actually needed since this
-           // is just the required template by standard c library
+// listening to -> int
+int listen_to(struct addrinfo *serv) {
+  struct addrinfo *p;
+  int sockfd, yes;
+  yes = 1;
+  for (p = serv; p != NULL; p = p->ai_next) {
+    if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+      perror("server: socket");
+      continue;
+    }
 
-  // we save errno to not interupt global scope while maintaining the last errno
-  // value before anything changed it in main
-  int saved_errno = errno;
-  char mesg[] = "Child process terminated\n";
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes) == -1) {
+      perror("setsockopt");
+      exit(1);
+    }
 
-  // wait for all child process and if they have finished then we close it and
-  // WNOHANG is used to return immediately if there is no child process, and btw
-  // this doesn't block the main loop since WNOHANG will immediately return the
-  // PID of the child process that was terminated and will not wait for any to
-  // be terminated(it will immediately return 0 if there is no child process
-  // that were terminated)
-  while (waitpid(-1, NULL, WNOHANG) > 0)
-    write(STDOUT_FILENO, mesg, sizeof(mesg) - 1);
+    if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+      perror("server: bind");
+      continue;
+    }
 
-  errno = saved_errno;
+    break;
+  }
+
+  freeaddrinfo(serv);
+
+  if (p == NULL) {
+    fprintf(stderr, "failed to bind\n");
+    exit(1);
+  }
+
+  if (listen(sockfd, BACKLOG) == -1) {
+    perror("listen");
+    exit(1);
+  }
+  return sockfd;
 }
 
 void *get_in_addr(struct sockaddr *sa) {
@@ -42,107 +60,100 @@ void *get_in_addr(struct sockaddr *sa) {
   return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
 
-int main(int argc, char *argv[]) {
-  int new_fd, sockfd;
-  struct addrinfo hints, *servinfo, *p;
-  struct sockaddr_storage their_addr;
-  struct sigaction sa; // define how the kernel should behave on specific signal
-  socklen_t sin_size;
-  int yes = 1;
-  char str[INET6_ADDRSTRLEN];
-  int status;
-  // this thing dangerous find a better way later
-  PORT = (argc > 1) ? argv[1] : PORT;
-
-  memset(&hints, 0, sizeof hints);
-  hints.ai_family = AF_UNSPEC;
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_flags = AI_PASSIVE;
-
-  if ((status = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
-    fprintf(stderr, "getaddrinfo: %s", gai_strerror(status));
-    return EXIT_FAILURE;
+// get a new file descriptor from accepted connection and will return -1 on err
+int connect_to_client(int sockfd, struct sockaddr *Caddr, socklen_t *sa_size) {
+  int new_fd = accept(sockfd, Caddr, sa_size);
+  if (new_fd == -1) {
+    return -1;
   }
 
-  for (p = servinfo; p != NULL; p = p->ai_next) {
-    if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-      perror("server: socket");
-      continue;
-    }
+  return new_fd;
+}
 
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
-      return EXIT_FAILURE;
-    }
+void sigchld_handler(int sig) {
+  (void)sig;
+  int save_errno = errno;
+  char mesg[] = "server: Child process terminated\n";
 
-    if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-      close(sockfd);
-      perror("server: bind");
-      continue;
-    }
+  while (waitpid(-1, NULL, WNOHANG) > 0)
+    write(STDOUT_FILENO, mesg, sizeof(mesg) - 1);
 
+  errno = save_errno;
+}
+
+// take signals and pass it to another helper function for that signals
+void signal_Handler(struct sigaction *sa, int action) {
+  switch (action) {
+  case SIGCHLD:
+    sa->sa_handler = sigchld_handler;
     break;
   }
-  freeaddrinfo(servinfo);
+  sigemptyset(&sa->sa_mask);
+  sa->sa_flags = SA_RESTART;
 
-  if (p == NULL) {
-    fprintf(stderr, "server: failed to bind\n");
-    return EXIT_FAILURE;
-  }
-
-  if (listen(sockfd, BACKLOG) == -1) {
-    perror("server: listen");
-    return EXIT_FAILURE;
-  }
-
-  // store sigchld_handler function as a variable on sa.sa_handler which is a
-  // function pointer
-  sa.sa_handler = sigchld_handler;
-  // empty the mask so no extra signal are blocked while executing
-  // sigchld_handler, BUT ONLY SIGCHLD will be blocked
-  sigemptyset(&sa.sa_mask);
-  // restart any syscall that get interupted by this signal action
-  sa.sa_flags = SA_RESTART;
-  // this tell the kernel whatever SIGCHLD happend you need to run
-  // sigchld_handler with
-  if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+  if (sigaction(action, sa, NULL) == -1) {
     perror("server: sigaction");
+    _exit(1);
+  }
+}
+
+int main(int argc, char *argv[]) {
+  struct addrinfo hints, *serv;
+  struct sockaddr_storage recvr_addr;
+  struct sigaction sa;
+  socklen_t sin_size;
+  char ipaddrstr[INET6_ADDRSTRLEN];
+  int status, sockfd, new_fd;
+
+  if (argc != 2) {
+    fprintf(stderr, "Please provide a valid port\n");
     return EXIT_FAILURE;
   }
 
-  printf("server: waiting for connections...\n");
+  PORT = argv[1];
+  memset(&hints, 0, sizeof hints);
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_flags = AI_PASSIVE;
 
+  if ((status = getaddrinfo(NULL, PORT, &hints, &serv)) != 0) {
+    fprintf(stderr, "server: getaddrinfo: %s\n", gai_strerror(status));
+    return EXIT_FAILURE;
+  }
+
+  sockfd = listen_to(serv);
+  printf("server: waiting for connection...\n");
+  signal_Handler(&sa, SIGCHLD);
+
+  sin_size = sizeof recvr_addr;
   while (1) {
-    sin_size = sizeof(their_addr);
-    new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+    sin_size = sizeof recvr_addr;
+    new_fd =
+        connect_to_client(sockfd, (struct sockaddr *)&recvr_addr, &sin_size);
     if (new_fd == -1) {
-      perror("accept");
+      perror("server: connect_to_client");
       continue;
     }
 
-    inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr),
-              str, sizeof(str));
-    printf("server: got connection from %s\n", str);
+    inet_ntop(recvr_addr.ss_family, get_in_addr((struct sockaddr *)&recvr_addr),
+              ipaddrstr, sizeof ipaddrstr);
 
-    // create a whole new copy of this process with fork
-    // fork will return 0 to child if succeded and -1 to parents if fails, what
-    // if it succeded? well it returns the pid to parent and 0 to child, right
-    // here we seed pid < 0 which will never execute on child and will only
-    // execute on parent if fork failed, and also pid == 0 will never true for
-    // parent since it will never receive the pid of 0 and it will always be
-    // true for child since it returns 0 if it successfully make a child process
+    printf("server: got connection from %s\n", ipaddrstr);
     pid_t pid = fork();
     if (pid < 0) {
-      perror("fork");
+      perror("server: fork");
+      close(new_fd);
     } else if (pid == 0) {
       close(sockfd);
-      if (send(new_fd, "Hello, World\n", 13, 0) == -1) {
-        perror("send");
+      if (send(new_fd, "Hello, client", 14, 0) == -1) {
+        perror("server: send");
         close(new_fd);
         _exit(1);
       }
       close(new_fd);
-      _exit(0); // <- always use exit for child process
+      _exit(0);
     }
+    close(new_fd);
   }
 
   return EXIT_SUCCESS;
