@@ -1,5 +1,7 @@
 #ifndef COMMON_H
 
+// idk why but i just feel like i need to make this without a single conditional
+// statement
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -18,26 +20,50 @@
 #define MAX_HEADER_SIZE 2048
 #define LOG_DIR "./log/server.log"
 
-// HTTP status codes
-#define HTTP_OK 200
-#define HTTP_NOT_FOUND 404
-#define HTTP_INTERLNAL_SERVER_ERROR 500
-#define HTTP_BAD_REQUEST 400
-
-// HTTP response templates
-#define HTTP_200_TEMPLATE "HTTP/1.1 200 OK\r\n"
-#define HTTP_404_TEMPLATE "HTTP/1.1 404 Not Found\r\n"
-#define HTTP_500_TEMPLATE "HTTP/1.1 500 Internal Server Error\r\n"
-#define HTTP_400_TEMPLATE "HTTP/1.1 400 Bad Request\r\n"
+// HTTP response templates and status codes
+typedef enum {
+  OK,
+  NOT_FOUND,
+  INTERNAL_SERVER_ERROR,
+  BAD_REQUEST,
+  RESPONSE_COUNT
+} ResponseType;
+const int STATUS_CODE[RESPONSE_COUNT] = {
+    [OK] = 200,
+    [NOT_FOUND] = 404,
+    [INTERNAL_SERVER_ERROR] = 500,
+    [BAD_REQUEST] = 400,
+};
+const char *const REPONSE_TEMPLATE[RESPONSE_COUNT] = {
+    [OK] = "HTTP/1.1 200 OK\r\n",
+    [NOT_FOUND] = "HTTP/1.1 404 Not Found\r\n",
+    [INTERNAL_SERVER_ERROR] = "HTTP/1.1 500 Internal Server Error\r\n",
+    [BAD_REQUEST] = "HTTP/1.1 400 Bad Request\r\n",
+};
 
 // Content
-#define CONTENT_TYPE_HTML "Content-Type: text/html; charset=UTF-8\r\n"
-#define CONTENT_TYPE_TEXT "Content-Type: text/plain; charset=UTF-8\r\n"
-#define CONTENT_TYPE_JSON "Content-Type: application/json\r\n"
+typedef enum {
+  CONTENT_TYPE_HTML,
+  CONTENT_TYPE_TEXT,
+  CONTENT_TYPE_JSON,
+  CONTENT_COUNT
+} ContentType;
+const char *const CONTENT[CONTENT_COUNT] = {
+    [CONTENT_TYPE_HTML] = "Content-Type: text/html; charset=UTF-8\r\n",
+    [CONTENT_TYPE_TEXT] = "Content-Type: text/plain; charset=UTF-8\r\n",
+    [CONTENT_TYPE_JSON] = "Content-Type: application/json\r\n",
+};
 
 // Connection header
-#define CONNECTION_CLOSE "Connection: close\r\n"
-#define CONNECTION_KEEP_ALIVE "Connection: keep-alive\r\n"
+typedef enum {
+  CONNECTION_CLOSE,
+  CONNECTION_KEEP_ALIVE,
+  CONNECTION_COUNT
+} ConnectionType;
+const char *const CONNECTION_HEADER[CONNECTION_COUNT] = {
+    [CONNECTION_CLOSE] = "Connection: close\r\n",
+    [CONNECTION_KEEP_ALIVE] = "Connection: keep-alive",
+};
 
 // Term text color
 #define COLOR_RED "\x1b[31m"
