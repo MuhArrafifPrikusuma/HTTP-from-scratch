@@ -1,3 +1,6 @@
+#ifndef PARSING_H
+#define PARSING_H
+
 #include "common.h"
 
 static inline int parse_status(const char *s) {
@@ -19,3 +22,5 @@ static inline ResponseType STATUS_CODE(const char *s) {
     return RESPONSE_ERR;
   }
 }
+
+#endif // !PARSING_H
