@@ -38,10 +38,8 @@ int main(int argc, char *argv[]) {
 
   SERVER_NAME = argv[1];
   PORT = argv[2];
-  char *inputBuf = argv[3];
-  size_t mesg_size = strlen(inputBuf) * sizeof(char);
-  char *mesg = malloc(mesg_size);
-  mesg = inputBuf;
+  char *mesg = argv[3];
+  size_t mesg_size = strlen(mesg);
 
   memset(&hints, 0, sizeof hints);
   hints.ai_socktype = SOCK_DGRAM;
@@ -51,6 +49,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "client: getaddrinfo: %s\n", gai_strerror(status));
     return EXIT_FAILURE;
   }
+
   make_socket(servinfo, &p, &sockfd);
 
   if ((numbytes = sendto(sockfd, mesg, mesg_size, 0, p->ai_addr,
