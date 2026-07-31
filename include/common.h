@@ -1,5 +1,6 @@
 #include <string.h>
 #ifndef COMMON_H
+#define COMMON_H
 
 // idk why but i just feel like i need to make this without a single conditional
 // statement
@@ -30,13 +31,6 @@ typedef enum {
   BAD_REQUEST,
   RESPONSE_ERR
 } ResponseType;
-const char *const RESPONSE_TEMPLATE[RESPONSE_ERR] = {
-    [OK] = "HTTP/1.1 200 OK\r\n",
-    [NOT_FOUND] = "HTTP/1.1 404 Not Found\r\n",
-    [INTERNAL_SERVER_ERROR] = "HTTP/1.1 500 Internal Server Error\r\n",
-    [BAD_REQUEST] = "HTTP/1.1 400 Bad Request\r\n",
-};
-
 // Content
 typedef enum {
   CONTENT_TYPE_HTML,
@@ -44,11 +38,6 @@ typedef enum {
   CONTENT_TYPE_JSON,
   CONTENT_COUNT
 } ContentType;
-const char *const CONTENT[CONTENT_COUNT] = {
-    [CONTENT_TYPE_HTML] = "Content-Type: text/html; charset=UTF-8\r\n",
-    [CONTENT_TYPE_TEXT] = "Content-Type: text/plain; charset=UTF-8\r\n",
-    [CONTENT_TYPE_JSON] = "Content-Type: application/json\r\n",
-};
 
 // Connection header
 typedef enum {
@@ -56,10 +45,10 @@ typedef enum {
   CONNECTION_KEEP_ALIVE,
   CONNECTION_COUNT
 } ConnectionType;
-const char *const CONNECTION_HEADER[CONNECTION_COUNT] = {
-    [CONNECTION_CLOSE] = "Connection: close\r\n",
-    [CONNECTION_KEEP_ALIVE] = "Connection: keep-alive",
-};
+
+extern const char *const CONTENT[CONTENT_COUNT];
+extern const char *const RESPONSE_TEMPLATE[RESPONSE_ERR];
+extern const char *const CONNECTION_HEADER[CONNECTION_COUNT];
 
 // Term text color
 #define COLOR_RED "\x1b[31m"
