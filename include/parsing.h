@@ -7,6 +7,7 @@ static inline int parse_status(const char *s) {
   return (s[0] - '0') * 100 + (s[1] - '0') * 10 + (s[2] - '0');
 }
 
+// Parse status code string and return ResponseType on success and -1 on failure
 static inline ResponseType STATUS_CODE(const char *s) {
   int code = parse_status(s);
   switch (code) {
@@ -19,7 +20,7 @@ static inline ResponseType STATUS_CODE(const char *s) {
   case 400:
     return BAD_REQUEST;
   default:
-    return RESPONSE_ERR;
+    return RESPONSE_UNKNOWN;
   }
 }
 
