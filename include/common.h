@@ -1,3 +1,4 @@
+#include <string.h>
 #ifndef COMMON_H
 
 // idk why but i just feel like i need to make this without a single conditional
@@ -7,6 +8,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <signal.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -26,15 +28,9 @@ typedef enum {
   NOT_FOUND,
   INTERNAL_SERVER_ERROR,
   BAD_REQUEST,
-  RESPONSE_COUNT
+  RESPONSE_ERR
 } ResponseType;
-const int STATUS_CODE[RESPONSE_COUNT] = {
-    [OK] = 200,
-    [NOT_FOUND] = 404,
-    [INTERNAL_SERVER_ERROR] = 500,
-    [BAD_REQUEST] = 400,
-};
-const char *const REPONSE_TEMPLATE[RESPONSE_COUNT] = {
+const char *const RESPONSE_TEMPLATE[RESPONSE_ERR] = {
     [OK] = "HTTP/1.1 200 OK\r\n",
     [NOT_FOUND] = "HTTP/1.1 404 Not Found\r\n",
     [INTERNAL_SERVER_ERROR] = "HTTP/1.1 500 Internal Server Error\r\n",
