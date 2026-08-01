@@ -1,28 +1,28 @@
-#include <stdalign.h>
-#include <string.h>
 #ifndef COMMON_H
-#define COMM
+#define COMMON_H
 
 // idk why but i just feel like i need to make this without a single conditional
 // statement
+#define _XOPEN_SOURCE 700
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <signal.h>
+#include <stdalign.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 // Constant server config
-#define DEFAULT_PORT 8080
+#define DEFAULT_PORT "8080"
 #define MAX_CONNECTIONS 128
 #define BUF_SIZE 10000
 #define MAX_PATH_LENGTH 512
 #define MAX_RECV_SIZE 1024
-#define MAX_HEADER_SEND 64
 #define LOG_DIR "./log/server.log"
 
 // HTTP response templates and status codes
@@ -35,9 +35,6 @@ typedef enum {
   RESPONSE_UNKNOWN = -1
 } ResponseType;
 
-typedef struct {
-  char text[MAX_HEADER_SEND];
-} HeaderTemplate_t;
 // Content
 typedef enum {
   CONTENT_TYPE_HTML,
@@ -47,10 +44,6 @@ typedef enum {
   CONTENT_UNKNOWN = -1
 } ContentType;
 
-typedef struct {
-  char text[MAX_HEADER_SEND];
-} ContentTemplate_t;
-
 // Connection header
 typedef enum {
   CONNECTION_CLOSE,
@@ -59,13 +52,44 @@ typedef enum {
   CONNECTION_UNKNOWN = -1
 } ConnectionType;
 
-typedef struct {
-  char text[MAX_HEADER_SEND];
-} ConnectionTemplate_t;
+char *if_argc_1(char *arg[]);
+char *if_argc_2(char *arg[]);
+char *if_argc_3(char *arg[]);
 
-extern const ContentTemplate_t CONTENT[CONTENT_COUNT];
-extern const HeaderTemplate_t RESPONSE_HEADER_TYPE[RESPONSE_COUNT];
-extern const ConnectionTemplate_t CONNECTION_TEMPLATE[CONNECTION_COUNT];
+// Functions array
+typedef char *(*which_Char_ft)(char *[]);
+
+// Arrays lookups
+extern const char *const CONTENT[CONTENT_COUNT];
+extern const char *const RESPONSE_TYPE[RESPONSE_COUNT];
+extern const char *const CONNECTION_TEMPLATE[CONNECTION_COUNT];
+
+// inline functions
+
+// return socket internet address after assigning af_family to get that family address
+static inline void *get_addr_in(const struct sockaddr *addr) {
+
+  // use byte offset to jump to sin_addr memory block
+  static const size_t offset_table[] = {
+      [AF_INET] = offsetof(struct sockaddr_in, sin_addr),
+      [AF_INET6] = offsetof(struct sockaddr_in6, sin6_addr),
+  };
+
+  size_t offset = offset_table[addr->sa_family];
+  // jump to the offset from sockaddr_in to sin_addr
+  return (void *)((const char *)addr + offset);
+}
+
+// this doesn't have any safety net and will not check whether the input is valid or not
+static inline char *get_port(const int argc, char *argv[]) {
+  which_Char_ft argv_func[3];
+  argv_func[0] = if_argc_1;
+  argv_func[1] = if_argc_2;
+  argv_func[2] = if_argc_3;
+
+  char *PORT = argv_func[argc - 1](argv);
+  return PORT;
+}
 
 // Term text color
 #define COLOR_RED "\x1b[31m"
