@@ -1,34 +1,42 @@
 cmake_minimum_required(VERSION 3.13)
 project(HTTPfs C)
 
-# LTO is a MUST! so that extern const will be replaced with
-# machine instructions at comptime eliminating runtime lookup
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_executable(server
     "${CMAKE_CURRENT_SOURCE_DIR}/include/common.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/server/server.c"
+)
+target_include_directories(server PRIVATE
+"${CMAKE_CURRENT_SOURCE_DIR}/include"
+"${CMAKE_CURRENT_SOURCE_DIR}/server"
 )
 
-if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-  # -O3: Enables aggressive optimizations
-  # -march=znver2: native Zen 2 AVX2
-  target_compile_options(server PRIVATE -O3 -march=znver2 -fomit-frame-pointer)
-  set(IPO_TEST_FLAGS "-03" "-march=znver2")
-else()
-  target_compile_options(server PRIVATE -O3 -march=native)
-  set(IPO_TEST_FLAGS "-O3" "-march=native")
+# native CPU arch for max performance
+# NOTE: may cause issues
+option(ENABLE_NATIVE_ARCH "Optimize for the build machine's CPU" OFF)
+
+include(CheckCCompilerFlag)
+function(add_flag_if_supported target flag)
+  string(MAKE_C_IDENTIFIER "${flag}" flag_var)
+  check_c_compiler_flag("${flag}" HAS_${flag_var})
+  if(HAS_${flag_var})
+    target_compile_options(${target} PRIVATE ${flag})
+  endif()
+endfunction()
+
+add_flag_if_supported(server -O3)
+# add_flag_if_supported(server -Wall)
+# add_flag_if_supported(server -Wextra)
+
+if(ENABLE_NATIVE_ARCH)
+  add_flag_if_supported(server -march=native)
 endif()
 
-# check and enable Link time optimizations
+# Linker
 include(CheckIPOSupported)
-# Compile IPO test with the FLAGS
-check_ipo_supported(
-  RESULT ipo_supported
-  OUTPUT ipo_error
-  OPTIONS ${IPO_TEST_FLAGS}
-)
-
+check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
 if(ipo_supported)
   set_target_properties(server PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
 else()

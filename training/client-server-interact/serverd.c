@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 700
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
@@ -128,15 +129,14 @@ int main(int argc, char *argv[]) {
   while (1) {
 
     sin_size = sizeof recvr_addr;
-    new_fd =
-        connect_to_client(sockfd, (struct sockaddr *)&recvr_addr, &sin_size);
+    new_fd = connect_to_client(sockfd, (struct sockaddr *)&recvr_addr, &sin_size);
     if (new_fd == -1) {
       perror("server: connect_to_client");
       continue;
     }
 
-    inet_ntop(recvr_addr.ss_family, get_in_addr((struct sockaddr *)&recvr_addr),
-              ipaddrstr, sizeof ipaddrstr);
+    inet_ntop(recvr_addr.ss_family, get_in_addr((struct sockaddr *)&recvr_addr), ipaddrstr,
+              sizeof ipaddrstr);
 
     printf("server: got connection from %s\n", ipaddrstr);
     pid_t pid = fork();

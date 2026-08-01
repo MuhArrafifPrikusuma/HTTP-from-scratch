@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200112L
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -122,19 +123,18 @@ int main(int argc, char *argv[]) {
     }
 
     char response[1024];
-    int response_len =
-        snprintf(response, sizeof(response),
-                 "HTTP/1.1 %s\r\n"
-                 "Content-Type: text/plain\r\n"
-                 "Content-Length: %zu\r\n"
-                 "Connection: close\r\n"
-                 "\r\n"
-                 "%s",
-                 (strcmp(path, "/") == 0 || strcmp(path, "/hello") == 0 ||
-                  strcmp(path, "/health") == 0 || strcmp(path, "/check") == 0)
-                     ? "200 OK"
-                     : "404 Not Found",
-                 strlen(body), body);
+    int response_len = snprintf(response, sizeof(response),
+                                "HTTP/1.1 %s\r\n"
+                                "Content-Type: text/plain\r\n"
+                                "Content-Length: %zu\r\n"
+                                "Connection: close\r\n"
+                                "\r\n"
+                                "%s",
+                                (strcmp(path, "/") == 0 || strcmp(path, "/hello") == 0 ||
+                                 strcmp(path, "/health") == 0 || strcmp(path, "/check") == 0)
+                                    ? "200 OK"
+                                    : "404 Not Found",
+                                strlen(body), body);
 
     if (send(new_fd, response, response_len, 0) == -1)
       continue;

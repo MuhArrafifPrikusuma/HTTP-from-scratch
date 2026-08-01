@@ -49,8 +49,8 @@ int main(int argc, char *argv[]) {
     printf("listener: waiting for recvfrom...\n");
     addr_len = sizeof ca;
 
-    if ((numbytes = recvfrom(sockfd, buf, sizeof buf, 0, (struct sockaddr *)&ca,
-                             &addr_len)) == -1) {
+    if ((numbytes = recvfrom(sockfd, buf, sizeof buf, 0, (struct sockaddr *)&ca, &addr_len)) ==
+        -1) {
       perror("recvfrom");
       return EXIT_FAILURE;
     }
@@ -72,8 +72,7 @@ int main(int argc, char *argv[]) {
 void bind_sock(struct addrinfo *servinfo, int *sockfd) {
   struct addrinfo *p;
   for (p = servinfo; p != NULL; p = p->ai_next) {
-    if ((*sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) ==
-        -1) {
+    if ((*sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
       perror("socket");
       continue;
     }
