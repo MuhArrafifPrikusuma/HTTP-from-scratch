@@ -7,6 +7,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 add_executable(server
     "${CMAKE_CURRENT_SOURCE_DIR}/include/common.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/server/server.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/server/server_error.c"
 )
 target_include_directories(server PRIVATE
 "${CMAKE_CURRENT_SOURCE_DIR}/include"
