@@ -7,8 +7,6 @@
 
 static int get_listener_socket(const char *port);
 
-// might need to move away all of this from main if i want to use multi thread for large file
-// transfer
 int main(int argc, char *argv[]) {
   char *PORT = get_port(argc, argv);
   printf("PORT: %s\n", PORT);
@@ -18,9 +16,8 @@ int main(int argc, char *argv[]) {
 }
 
 // jump functions
-
 static void handle_bind(ListenerLoopContext *ctx) {
-  ctx->current_state += abs(bind(ctx->fd, ctx->info->ai_addr, ctx->info->ai_addrlen)) + 1;
+  ctx->current_state = (bind(ctx->fd, ctx->info->ai_addr, ctx->info->ai_addrlen) == 0) + 1;
   (void)ctx->actions[ctx->current_state](ctx);
 }
 static void handle_continue(ListenerLoopContext *ctx) { ctx->current_state = 0; }
@@ -35,7 +32,6 @@ static int get_listener_socket(const char *PORT) {
   int status;
   int yes = 1;
 
-  // Listen... i couldn't figure out a better way ok?
   gai_handler[0] = if_gai_0;
   gai_handler[1] = if_gai_not_0;
 
@@ -44,8 +40,8 @@ static int get_listener_socket(const char *PORT) {
   hints.ai_family = AF_UNSPEC;
   hints.ai_flags = AI_PASSIVE;
 
-  status = (getaddrinfo(NULL, PORT, &hints, &servinfo) != 0);
-  gai_handler[status](status);
+  status = getaddrinfo(NULL, PORT, &hints, &servinfo);
+  gai_handler[(status != 0)](status);
 
   ListenerStateAction Listener_action_table[] = {
       handle_bind,
@@ -56,8 +52,9 @@ static int get_listener_socket(const char *PORT) {
   ListenerLoopContext ctx;
   ctx.actions = Listener_action_table;
   ctx.current_state = 0;
-
+  ctx.fd = 0;
   ctx.info = servinfo;
+
   while (keep_running) {
     ctx.fd = socket(ctx.info->ai_family, ctx.info->ai_socktype, ctx.info->ai_protocol);
     ctx.current_state = (ctx.fd < 0);
@@ -65,7 +62,7 @@ static int get_listener_socket(const char *PORT) {
 
     (void)ctx.actions[ctx.current_state](&ctx);
     ctx.info = ctx.info->ai_next;
-    ctx.current_state = (ctx.info == NULL);
+    ctx.current_state = (ctx.info == NULL) + 1;
     (void)ctx.actions[ctx.current_state](&ctx);
   }
 
