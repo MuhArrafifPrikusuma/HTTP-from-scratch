@@ -2,6 +2,7 @@
 #include <netdb.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/socket.h>
 
 static int get_listener_socket(const char *port);
@@ -37,24 +38,13 @@ static int get_listener_socket(const char *PORT) {
   // Listen... i couldn't figure out a better way ok?
   gai_handler[0] = if_gai_0;
   gai_handler[1] = if_gai_not_0;
-  gai_handler[2] = if_gai_not_0;
-  gai_handler[3] = if_gai_not_0;
-  gai_handler[4] = if_gai_not_0;
-  gai_handler[5] = if_gai_not_0;
-  gai_handler[6] = if_gai_not_0;
-  gai_handler[7] = if_gai_not_0;
-  gai_handler[8] = if_gai_not_0;
-  gai_handler[9] = if_gai_not_0;
-  gai_handler[10] = if_gai_not_0;
-  gai_handler[11] = if_gai_not_0;
-  gai_handler[12] = if_gai_not_0;
 
   memset(&hints, 0, sizeof hints);
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_family = AF_UNSPEC;
   hints.ai_flags = AI_PASSIVE;
 
-  status = abs(getaddrinfo(NULL, PORT, &hints, &servinfo));
+  status = (getaddrinfo(NULL, PORT, &hints, &servinfo) != 0);
   gai_handler[status](status);
 
   ListenerStateAction Listener_action_table[] = {
