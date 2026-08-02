@@ -13,7 +13,7 @@ struct ListenerLoopContext {
   ListenerStateAction *actions;
 };
 
-nerrh_ft *gai_handler[13];
+nerrh_ft *gai_handler[2];
 int keep_running = 1;
 
 #endif // !SERVER_H
