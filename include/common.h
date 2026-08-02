@@ -53,6 +53,7 @@ typedef enum {
   CONNECTION_UNKNOWN = -1
 } ConnectionType;
 
+// helper for local function
 char *if_argc_1(char *arg[]);
 char *if_argc_2(char *arg[]);
 char *if_argc_3(char *arg[]);

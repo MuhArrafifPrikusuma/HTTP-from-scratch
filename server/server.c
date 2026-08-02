@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 
 static int get_listener_socket(const char *port);
+
 // might need to move away all of this from main if i want to use multi thread for large file
 // transfer
 int main(int argc, char *argv[]) {
@@ -16,18 +17,21 @@ int main(int argc, char *argv[]) {
 }
 
 // jump functions
-static void bind_s() { return; }
 
-static void do_bind(int sockfd, struct addrinfo *info) {
-  Loop_and_bind_ft *handle_bind[2];
-  int is_err = abs(bind(sockfd, info->ai_addr, info->ai_addrlen));
-  handle_bind[0] = bind_s;
+static void handle_bind(ListenerLoopContext *ctx) {
+  ctx->current_state += abs(bind(ctx->fd, ctx->info->ai_addr, ctx->info->ai_addrlen)) + 1;
+  (void)ctx->actions[ctx->current_state](ctx);
 }
-static void do_notbind() { return; }
+static void handle_continue(ListenerLoopContext *ctx) { ctx->current_state = 0; }
+
+static void handle_break(ListenerLoopContext *ctx) {
+  printf("found! listener fd: %d\n", ctx->fd);
+  keep_running = 0;
+}
 
 static int get_listener_socket(const char *PORT) {
-  struct addrinfo hints, *servinfo, *p;
-  int status, sockfd;
+  struct addrinfo hints, *servinfo;
+  int status;
   int yes = 1;
 
   // Listen... i couldn't figure out a better way ok?
@@ -52,17 +56,28 @@ static int get_listener_socket(const char *PORT) {
 
   status = abs(getaddrinfo(NULL, PORT, &hints, &servinfo));
   gai_handler[status](status);
-  Loop_and_bind_ft *handle_iteration[2];
-  handle_iteration[0] = do_bind;
-  handle_iteration[1] = do_notbind;
 
-  // NOTE: figure this out later
-  int i;
+  ListenerStateAction Listener_action_table[] = {
+      handle_bind,
+      handle_continue,
+      handle_break,
+  };
+
+  ListenerLoopContext ctx;
+  ctx.actions = Listener_action_table;
+  ctx.current_state = 0;
+
+  ctx.info = servinfo;
   while (keep_running) {
-    sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+    ctx.fd = socket(ctx.info->ai_family, ctx.info->ai_socktype, ctx.info->ai_protocol);
+    ctx.current_state = (ctx.fd < 0);
+    setsockopt(ctx.fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
 
-    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
-    int is_error = (sockfd < 0);
-    handle_iteration[is_error](sockfd, p);
+    (void)ctx.actions[ctx.current_state](&ctx);
+    ctx.info = ctx.info->ai_next;
+    ctx.current_state = (ctx.info == NULL);
+    (void)ctx.actions[ctx.current_state](&ctx);
   }
+
+  return ctx.fd;
 }

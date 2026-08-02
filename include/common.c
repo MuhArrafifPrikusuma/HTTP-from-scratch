@@ -27,5 +27,3 @@ char *if_argc_3(char *arg[]) {
   fprintf(stderr, "Too many arguments!");
   _exit(1);
 }
-
-void *if_v4()
