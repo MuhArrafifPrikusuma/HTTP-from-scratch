@@ -1,6 +1,4 @@
 #include "common.h"
-#include <stdio.h>
-#include <unistd.h>
 
 alignas(64) const char *const CONTENT[CONTENT_COUNT] = {
     [CONTENT_TYPE_HTML] = "Content-Type: text/html; charset=UTF-8\r\n",
@@ -29,3 +27,5 @@ char *if_argc_3(char *arg[]) {
   fprintf(stderr, "Too many arguments!");
   _exit(1);
 }
+
+void *if_v4()
