@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 700
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -50,8 +51,7 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), ipstr,
-              sizeof ipstr);
+    inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), ipstr, sizeof ipstr);
     printf("client: attempting connection to %s\n", ipstr);
 
     sleep(1);

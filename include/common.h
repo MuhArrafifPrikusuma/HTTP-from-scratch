@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdalign.h>
 #include <stddef.h>

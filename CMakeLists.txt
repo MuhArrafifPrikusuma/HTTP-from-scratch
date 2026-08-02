@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 project(HTTPfs C)
 
-set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_executable(server
@@ -14,7 +14,7 @@ target_include_directories(server PRIVATE
 "${CMAKE_CURRENT_SOURCE_DIR}/server"
 )
 
-# native CPU arch for max performance
+# native CPU arch build
 # NOTE: may cause issues
 option(ENABLE_NATIVE_ARCH "Optimize for the build machine's CPU" OFF)
 
@@ -27,6 +27,7 @@ function(add_flag_if_supported target flag)
   endif()
 endfunction()
 
+# Compiler flags
 add_flag_if_supported(server -O3)
 # add_flag_if_supported(server -Wall)
 # add_flag_if_supported(server -Wextra)
@@ -35,7 +36,7 @@ if(ENABLE_NATIVE_ARCH)
   add_flag_if_supported(server -march=native)
 endif()
 
-# Linker
+# Use link time optimization if supported
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
 if(ipo_supported)
