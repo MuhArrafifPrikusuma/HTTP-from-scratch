@@ -1,9 +1,11 @@
 #include "server.h"
+#include <fcntl.h>
 #include <netdb.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 static int get_listener_socket(const char *port);
 
@@ -11,22 +13,27 @@ int main(int argc, char *argv[]) {
   char *PORT = get_port(argc, argv);
   printf("PORT: %s\n", PORT);
 
-  int sockfd = get_listener_socket(PORT);
+  int listener_fd = get_listener_socket(PORT);
+
   EXIT_SUCCESS;
 }
 
 // jump functions
-static void handle_bind(ListenerLoopContext *ctx) {
+static void handle_Listener_bind(ListenerLoopContext *ctx) {
   ctx->current_state = (bind(ctx->fd, ctx->info->ai_addr, ctx->info->ai_addrlen) == 0) + 1;
   (void)ctx->actions[ctx->current_state](ctx);
 }
-static void handle_continue(ListenerLoopContext *ctx) { ctx->current_state = 0; }
-
-static void handle_break(ListenerLoopContext *ctx) {
+static void handle_Listener_continue(ListenerLoopContext *ctx) { ctx->current_state = 0; }
+static void handle_Listener_break(ListenerLoopContext *ctx) {
   printf("found! listener fd: %d\n", ctx->fd);
   keep_running = 0;
 }
+static void handle_Listener_error(ListenerLoopContext *ctx) {
+  fprintf(stderr, "server: Failed to bind listening socket");
+  _exit(1);
+}
 
+// take provided port from argv return listener fd when success and crash when failed
 static int get_listener_socket(const char *PORT) {
   struct addrinfo hints, *servinfo;
   int status;
@@ -44,9 +51,13 @@ static int get_listener_socket(const char *PORT) {
   gai_handler[(status != 0)](status);
 
   ListenerStateAction Listener_action_table[] = {
-      handle_bind,
-      handle_continue,
-      handle_break,
+      handle_Listener_bind,
+      handle_Listener_continue,
+      handle_Listener_break,
+  };
+  ListenerStateAction New_Listener_action_table[] = {
+      handle_Listener_continue,
+      handle_Listener_error,
   };
 
   ListenerLoopContext ctx;
@@ -56,7 +67,8 @@ static int get_listener_socket(const char *PORT) {
   ctx.info = servinfo;
 
   while (keep_running) {
-    ctx.fd = socket(ctx.info->ai_family, ctx.info->ai_socktype, ctx.info->ai_protocol);
+    ctx.fd =
+        socket(ctx.info->ai_family, ctx.info->ai_socktype | SOCK_NONBLOCK, ctx.info->ai_protocol);
     ctx.current_state = (ctx.fd < 0);
     setsockopt(ctx.fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
 
@@ -65,6 +77,13 @@ static int get_listener_socket(const char *PORT) {
     ctx.current_state = (ctx.info == NULL) + 1;
     (void)ctx.actions[ctx.current_state](&ctx);
   }
+  ctx.current_state = ctx.current_state >> 1;
+  ctx.actions = New_Listener_action_table;
+  ctx.actions[ctx.current_state](&ctx);
+
+  ctx.current_state = listen(ctx.fd, MAX_BACKLOG);
+  ctx.actions[ctx.current_state](&ctx);
+  freeaddrinfo(servinfo);
 
   return ctx.fd;
 }

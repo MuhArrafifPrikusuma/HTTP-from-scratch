@@ -8,19 +8,18 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
-#include <poll.h>
 #include <signal.h>
 #include <stdalign.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 // Constant server config
 #define DEFAULT_PORT "8080"
-#define MAX_CONNECTIONS 128
 #define BUF_SIZE 10000
 #define MAX_PATH_LENGTH 512
 #define MAX_RECV_SIZE 1024

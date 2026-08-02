@@ -1,5 +1,8 @@
 #ifndef SERVER_H
 #define SERVER_H
+
+#define MAX_BACKLOG 2000
+
 #include "../include/common.h"
 #include "server_error.h"
 #include <netdb.h>
