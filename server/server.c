@@ -144,8 +144,8 @@ static int accept_incoming_connection(int listener) {
   struct sockaddr_storage their_addr;
 
   AcceptFlagManipAction actions_table[] = {
-      accept_fcntl_action_success,
       accept_fcntl_action_failed,
+      accept_fcntl_action_success,
   };
   AcceptFlagManipulationContext ctx;
   ctx.actions = actions_table;
@@ -154,15 +154,15 @@ static int accept_incoming_connection(int listener) {
   socklen_t addr_size = sizeof their_addr;
   ctx.fd = accept(listener, (struct sockaddr *)&their_addr, &addr_size);
 
-  ctx.flag = fcntl(ctx.fd, F_GETFD, 0);
+  ctx.flag = fcntl(ctx.fd, F_GETFL, 0);
   size_t valid_flag = ~((size_t)(ctx.flag >> (sizeof(ctx.flag) * 8 - 1)));
   size_t is_success = (valid_flag & 1);
   ctx.actions[is_success](&ctx);
 
-  ctx.flag = fcntl(ctx.returnValue, F_SETFD, ctx.flag | O_NONBLOCK | O_CLOEXEC);
+  ctx.flag = fcntl(ctx.returnValue, F_SETFL, ctx.flag | O_NONBLOCK);
 
   valid_flag = ~((size_t)(ctx.flag >> (sizeof(ctx.flag) * 8 - 1)));
-  is_success = (valid_flag * 1);
+  is_success = (valid_flag & 1);
   ctx.actions[is_success](&ctx);
 
   return ctx.returnValue;
