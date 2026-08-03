@@ -5,10 +5,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 static int get_listener_socket(const char *port);
-static int sendall(int fd, char *buf, size_t *len);
+static int sendall(int fd, const char *restrict buf, size_t *len);
 
 int main(int argc, char *argv[]) {
   char *PORT = get_port(argc, argv);
@@ -89,46 +90,39 @@ static int get_listener_socket(const char *port) {
   return ctx.fd;
 }
 
-// action helper
-static void send_success(int *ret) { return; }
-static void send_failed(int *ret) { keep_running = 0; }
-static void if_send_success(int *ret) { *ret = 0; }
-static void if_send_failed(int *ret) { *ret = -1; }
-
 // make sure to send all data without failing, this will change *len to the total size that was send
 // successfully to later use to see how many actually get send if fails and will return -1 if err
-static int sendall(int fd, char *restrict buf, size_t *len) {
-  int total_send = 0;
-  int bytesLeft = *len;
-  int n;
-  int returnValue;
+static int sendall(int fd, const char *restrict buf, size_t *len) {
+  size_t total_sent = 0;
+  size_t target_len = *len;
+  int status_code = 0;
 
-  keep_running = 1;
-  SendAllStateAction action_table[] = {
-      send_success,
-      send_failed,
-  };
-  SendAllStateAction new_action_table[] = {
-      if_send_success,
-      if_send_failed,
-  };
-
-  SendAllLoopContext ctx;
-  ctx.state = 0;
-  ctx.actions = action_table;
-
+  keep_running = (*len > 0);
   while (keep_running) {
-    n = send(fd, buf + total_send, bytesLeft, 0);
-    ctx.state = (n < 0);
-    ctx.actions[ctx.state](&returnValue);
-    total_send += n;
-    bytesLeft -= n;
+    size_t bytes_left = target_len - total_sent;
 
-    ctx.state = (total_send >= *len);
-    ctx.actions[ctx.state](&returnValue);
+    ssize_t n = send(fd, buf + total_sent, bytes_left, 0);
+
+    // prevent sending 0 bytes
+    size_t adjust_n = n - 1;
+    // return 0xFFFFFFFFFF on success 0x00000000 on failure
+    size_t valid_mask = ~((size_t)(adjust_n >> (sizeof(ssize_t) * 8 - 1)));
+    size_t is_valid = (valid_mask & 1);
+
+    size_t bytes_left_mask = (bytes_left > 0);
+
+    // both valid mask and bytes_left_mask must succeed or else we add 0 to total_sent
+    size_t combine_mask = valid_mask & -(bytes_left_mask);
+    size_t clean_n = (size_t)n & combine_mask;
+
+    total_sent += clean_n;
+
+    status_code |= (~valid_mask & -1);
+
+    keep_running = is_valid & (total_sent < target_len);
   }
 
-  *len = total_send;
+  *len = total_sent;
 
-  return returnValue;
+  return status_code;
 }
