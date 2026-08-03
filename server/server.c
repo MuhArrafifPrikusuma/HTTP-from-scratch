@@ -10,12 +10,21 @@
 
 static int get_listener_socket(const char *port);
 static int sendall(int fd, const char *restrict buf, size_t *len);
+static int accept_incoming_connection(int listener);
 
 int main(int argc, char *argv[]) {
   char *PORT = get_port(argc, argv);
   printf("PORT: %s\n", PORT);
 
   int listener_fd = get_listener_socket(PORT);
+
+  while (1) {
+    int test = accept_incoming_connection(listener_fd);
+    if (test == -1) {
+      continue;
+    }
+    printf("accepted fd: %d\n", test);
+  }
 
   EXIT_SUCCESS;
 }
@@ -96,7 +105,7 @@ static int sendall(int fd, const char *restrict buf, size_t *len) {
   size_t target_len = *len;
   int status_code = 0;
 
-  int keep_running = (*len > 0);
+  int keep_running = (target_len > 0);
   while (keep_running) {
     size_t bytes_left = target_len - total_sent;
 
@@ -105,7 +114,6 @@ static int sendall(int fd, const char *restrict buf, size_t *len) {
     // return 0xFFFFFFFFFF on success 0x00000000 on failure
     size_t valid_mask = ~((size_t)(n >> (sizeof(ssize_t) * 8 - 1)));
     size_t is_valid = (valid_mask & 1);
-
     size_t bytes_left_mask = (bytes_left > 0);
 
     // both valid mask and bytes_left_mask must succeed or else we add 0 to total_sent
@@ -113,13 +121,49 @@ static int sendall(int fd, const char *restrict buf, size_t *len) {
     size_t clean_n = (size_t)n & combine_mask;
 
     total_sent += clean_n;
-
     status_code |= (~valid_mask & -1);
-
     keep_running = is_valid & (total_sent < target_len);
   }
 
   *len = total_sent;
 
   return status_code;
+}
+
+static void accept_fcntl_action_success(AcceptFlagManipulationContext *ctx) {
+  ctx->returnValue = ctx->fd;
+}
+static void accept_fcntl_action_failed(AcceptFlagManipulationContext *ctx) {
+  ctx->returnValue = -1;
+}
+
+// non blocking function to accept incoming connection and return fd on success and -1 on err
+// NOTE: if i use this function i need to also detect whether the connection is closed to then
+// remove that file descriptor
+static int accept_incoming_connection(int listener) {
+  struct sockaddr_storage their_addr;
+
+  AcceptFlagManipAction actions_table[] = {
+      accept_fcntl_action_success,
+      accept_fcntl_action_failed,
+  };
+  AcceptFlagManipulationContext ctx;
+  ctx.actions = actions_table;
+  ctx.returnValue = 0;
+
+  socklen_t addr_size = sizeof their_addr;
+  ctx.fd = accept(listener, (struct sockaddr *)&their_addr, &addr_size);
+
+  ctx.flag = fcntl(ctx.fd, F_GETFD, 0);
+  size_t valid_flag = ~((size_t)(ctx.flag >> (sizeof(ctx.flag) * 8 - 1)));
+  size_t is_success = (valid_flag & 1);
+  ctx.actions[is_success](&ctx);
+
+  ctx.flag = fcntl(ctx.returnValue, F_SETFD, ctx.flag | O_NONBLOCK | O_CLOEXEC);
+
+  valid_flag = ~((size_t)(ctx.flag >> (sizeof(ctx.flag) * 8 - 1)));
+  is_success = (valid_flag * 1);
+  ctx.actions[is_success](&ctx);
+
+  return ctx.returnValue;
 }

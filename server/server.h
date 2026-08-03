@@ -9,17 +9,19 @@
 
 typedef struct ListenerLoopContext ListenerLoopContext;
 typedef struct SendAllLoopContext SendAllLoopContext;
+typedef struct AcceptFlagManipulationContext AcceptFlagManipulationContext;
 typedef int (*ListenerStateAction)(ListenerLoopContext *);
-typedef void (*SendAllStateAction)(int *);
+typedef void (*AcceptFlagManipAction)(AcceptFlagManipulationContext *);
 struct ListenerLoopContext {
   struct addrinfo *info;
   ListenerStateAction *actions;
   ssize_t fd;
   int state;
 };
-struct SendAllLoopContext {
-  SendAllStateAction *actions;
-  int state;
+struct AcceptFlagManipulationContext {
+  AcceptFlagManipAction *actions;
+  ssize_t flag;
+  int fd;
   int returnValue;
 };
 
