@@ -20,10 +20,10 @@ int main(int argc, char *argv[]) {
 
 // jump functions
 static void handle_Listener_bind(ListenerLoopContext *ctx) {
-  ctx->current_state = (bind(ctx->fd, ctx->info->ai_addr, ctx->info->ai_addrlen) == 0) + 1;
-  (void)ctx->actions[ctx->current_state](ctx);
+  ctx->state = (bind(ctx->fd, ctx->info->ai_addr, ctx->info->ai_addrlen) == 0) + 1;
+  (void)ctx->actions[ctx->state](ctx);
 }
-static void handle_Listener_continue(ListenerLoopContext *ctx) { ctx->current_state = 0; }
+static void handle_Listener_continue(ListenerLoopContext *ctx) { ctx->state = 0; }
 static void handle_Listener_break(ListenerLoopContext *ctx) {
   printf("found! listener fd: %d\n", ctx->fd);
   keep_running = 0;
@@ -34,7 +34,7 @@ static void handle_Listener_error(ListenerLoopContext *ctx) {
 }
 
 // take provided port from argv return listener fd when success and crash when failed
-static int get_listener_socket(const char *PORT) {
+static int get_listener_socket(const char *port) {
   struct addrinfo hints, *servinfo;
   int status;
   int yes = 1;
@@ -47,7 +47,7 @@ static int get_listener_socket(const char *PORT) {
   hints.ai_family = AF_UNSPEC;
   hints.ai_flags = AI_PASSIVE;
 
-  status = getaddrinfo(NULL, PORT, &hints, &servinfo);
+  status = getaddrinfo(NULL, port, &hints, &servinfo);
   gai_handler[(status != 0)](status);
 
   ListenerStateAction Listener_action_table[] = {
@@ -62,27 +62,27 @@ static int get_listener_socket(const char *PORT) {
 
   ListenerLoopContext ctx;
   ctx.actions = Listener_action_table;
-  ctx.current_state = 0;
+  ctx.state = 0;
   ctx.fd = 0;
   ctx.info = servinfo;
 
   while (keep_running) {
-    ctx.fd =
-        socket(ctx.info->ai_family, ctx.info->ai_socktype | SOCK_NONBLOCK, ctx.info->ai_protocol);
-    ctx.current_state = (ctx.fd < 0);
+    ctx.fd = socket(ctx.info->ai_family, ctx.info->ai_socktype | SOCK_NONBLOCK | SOCK_CLOEXEC,
+                    ctx.info->ai_protocol);
+    ctx.state = (ctx.fd < 0);
     setsockopt(ctx.fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
 
-    (void)ctx.actions[ctx.current_state](&ctx);
+    (void)ctx.actions[ctx.state](&ctx);
     ctx.info = ctx.info->ai_next;
-    ctx.current_state = (ctx.info == NULL) + 1;
-    (void)ctx.actions[ctx.current_state](&ctx);
+    ctx.state = (ctx.info == NULL) + 1;
+    (void)ctx.actions[ctx.state](&ctx);
   }
-  ctx.current_state = ctx.current_state >> 1;
+  ctx.state = ctx.state >> 1;
   ctx.actions = New_Listener_action_table;
-  ctx.actions[ctx.current_state](&ctx);
+  ctx.actions[ctx.state](&ctx);
 
-  ctx.current_state = listen(ctx.fd, MAX_BACKLOG);
-  ctx.actions[ctx.current_state](&ctx);
+  ctx.state = listen(ctx.fd, MAX_BACKLOG);
+  ctx.actions[ctx.state](&ctx);
   freeaddrinfo(servinfo);
 
   return ctx.fd;
