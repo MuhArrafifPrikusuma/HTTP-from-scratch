@@ -11,7 +11,7 @@ typedef struct ListenerLoopContext ListenerLoopContext;
 typedef void (*ListenerStateAction)(ListenerLoopContext *);
 struct ListenerLoopContext {
   int fd;
-  int current_state;
+  int state;
   struct addrinfo *info;
   ListenerStateAction *actions;
 };
