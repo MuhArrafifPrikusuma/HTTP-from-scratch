@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 static int get_listener_socket(const char *port);
+static int sendall(int fd, char *buf, size_t *len);
 
 int main(int argc, char *argv[]) {
   char *PORT = get_port(argc, argv);
@@ -18,7 +19,7 @@ int main(int argc, char *argv[]) {
   EXIT_SUCCESS;
 }
 
-// jump functions
+// actions helper
 static void handle_Listener_bind(ListenerLoopContext *ctx) {
   ctx->state = (bind(ctx->fd, ctx->info->ai_addr, ctx->info->ai_addrlen) == 0) + 1;
   (void)ctx->actions[ctx->state](ctx);
@@ -86,4 +87,48 @@ static int get_listener_socket(const char *port) {
   freeaddrinfo(servinfo);
 
   return ctx.fd;
+}
+
+// action helper
+static void send_success(int *ret) { return; }
+static void send_failed(int *ret) { keep_running = 0; }
+static void if_send_success(int *ret) { *ret = 0; }
+static void if_send_failed(int *ret) { *ret = -1; }
+
+// make sure to send all data without failing, this will change *len to the total size that was send
+// successfully to later use to see how many actually get send if fails and will return -1 if err
+static int sendall(int fd, char *restrict buf, size_t *len) {
+  int total_send = 0;
+  int bytesLeft = *len;
+  int n;
+  int returnValue;
+
+  keep_running = 1;
+  SendAllStateAction action_table[] = {
+      send_success,
+      send_failed,
+  };
+  SendAllStateAction new_action_table[] = {
+      if_send_success,
+      if_send_failed,
+  };
+
+  SendAllLoopContext ctx;
+  ctx.state = 0;
+  ctx.actions = action_table;
+
+  while (keep_running) {
+    n = send(fd, buf + total_send, bytesLeft, 0);
+    ctx.state = (n < 0);
+    ctx.actions[ctx.state](&returnValue);
+    total_send += n;
+    bytesLeft -= n;
+
+    ctx.state = (total_send >= *len);
+    ctx.actions[ctx.state](&returnValue);
+  }
+
+  *len = total_send;
+
+  return returnValue;
 }
