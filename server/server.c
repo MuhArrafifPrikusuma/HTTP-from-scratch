@@ -21,16 +21,11 @@ int main(int argc, char *argv[]) {
 }
 
 // actions helper
-static void handle_Listener_bind(ListenerLoopContext *ctx) {
-  ctx->state = (bind(ctx->fd, ctx->info->ai_addr, ctx->info->ai_addrlen) == 0) + 1;
-  (void)ctx->actions[ctx->state](ctx);
+static int handle_Listener_bind(ListenerLoopContext *ctx) {
+  return abs((bind(ctx->fd, ctx->info->ai_addr, ctx->info->ai_addrlen)));
 }
-static void handle_Listener_continue(ListenerLoopContext *ctx) { ctx->state = 0; }
-static void handle_Listener_break(ListenerLoopContext *ctx) {
-  printf("found! listener fd: %d\n", ctx->fd);
-  keep_running = 0;
-}
-static void handle_Listener_error(ListenerLoopContext *ctx) {
+static int handle_Listener_continue(ListenerLoopContext *ctx) { return 0; }
+static int handle_Listener_error(ListenerLoopContext *ctx) {
   fprintf(stderr, "server: Failed to bind listening socket");
   _exit(1);
 }
@@ -53,37 +48,41 @@ static int get_listener_socket(const char *port) {
   gai_handler[(status != 0)](status);
 
   ListenerStateAction Listener_action_table[] = {
-      handle_Listener_bind,
       handle_Listener_continue,
-      handle_Listener_break,
+      handle_Listener_bind,
   };
   ListenerStateAction New_Listener_action_table[] = {
       handle_Listener_continue,
       handle_Listener_error,
   };
-
   ListenerLoopContext ctx;
   ctx.actions = Listener_action_table;
   ctx.state = 0;
   ctx.fd = 0;
   ctx.info = servinfo;
 
+  int keep_running = 1;
   while (keep_running) {
     ctx.fd = socket(ctx.info->ai_family, ctx.info->ai_socktype | SOCK_NONBLOCK | SOCK_CLOEXEC,
                     ctx.info->ai_protocol);
-    ctx.state = (ctx.fd < 0);
+
+    size_t valid_mask = ~((size_t)(ctx.fd >> (sizeof(ssize_t) * 8 - 1)));
+    size_t is_valid = (valid_mask & 1);
     setsockopt(ctx.fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes);
 
-    (void)ctx.actions[ctx.state](&ctx);
+    size_t is_error = ctx.actions[is_valid](&ctx);
     ctx.info = ctx.info->ai_next;
-    ctx.state = (ctx.info == NULL) + 1;
-    (void)ctx.actions[ctx.state](&ctx);
+    ctx.state = (ctx.info != NULL);
+
+    ctx.state = (is_error & ctx.state);
+    keep_running = (is_error & ctx.state);
   }
-  ctx.state = ctx.state >> 1;
   ctx.actions = New_Listener_action_table;
   ctx.actions[ctx.state](&ctx);
 
-  ctx.state = listen(ctx.fd, MAX_BACKLOG);
+  printf("found fd: %d!\n", (int)ctx.fd);
+
+  ctx.state = abs(listen(ctx.fd, MAX_BACKLOG));
   ctx.actions[ctx.state](&ctx);
   freeaddrinfo(servinfo);
 
@@ -97,16 +96,14 @@ static int sendall(int fd, const char *restrict buf, size_t *len) {
   size_t target_len = *len;
   int status_code = 0;
 
-  keep_running = (*len > 0);
+  int keep_running = (*len > 0);
   while (keep_running) {
     size_t bytes_left = target_len - total_sent;
 
     ssize_t n = send(fd, buf + total_sent, bytes_left, 0);
 
-    // prevent sending 0 bytes
-    size_t adjust_n = n - 1;
     // return 0xFFFFFFFFFF on success 0x00000000 on failure
-    size_t valid_mask = ~((size_t)(adjust_n >> (sizeof(ssize_t) * 8 - 1)));
+    size_t valid_mask = ~((size_t)(n >> (sizeof(ssize_t) * 8 - 1)));
     size_t is_valid = (valid_mask & 1);
 
     size_t bytes_left_mask = (bytes_left > 0);
