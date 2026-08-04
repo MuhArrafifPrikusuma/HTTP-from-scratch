@@ -1,16 +1,11 @@
 #include "server.h"
-#include <fcntl.h>
 #include <netdb.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
 
-static int get_listener_socket(const char *port);
+int get_listener_socket(const char *port);
 static int sendall(int fd, const char *restrict buf, size_t *len);
-static int accept_incoming_connection(int listener);
+int accept_incoming_connection(int listener);
+
+#ifndef TESTING
 
 int main(int argc, char *argv[]) {
   char *PORT = get_port(argc, argv);
@@ -29,6 +24,8 @@ int main(int argc, char *argv[]) {
   EXIT_SUCCESS;
 }
 
+#endif /* ifdef TESTING */
+
 // actions helper
 static int handle_Listener_bind(ListenerLoopContext *ctx) {
   return abs((bind(ctx->fd, ctx->info->ai_addr, ctx->info->ai_addrlen)));
@@ -40,7 +37,7 @@ static int handle_Listener_error(ListenerLoopContext *ctx) {
 }
 
 // take provided port from argv return listener fd when success and crash when failed
-static int get_listener_socket(const char *port) {
+int get_listener_socket(const char *port) {
   struct addrinfo hints, *servinfo;
   int status;
   int yes = 1;
@@ -51,7 +48,7 @@ static int get_listener_socket(const char *port) {
   memset(&hints, 0, sizeof hints);
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_family = AF_UNSPEC;
-  hints.ai_flags = AI_PASSIVE;
+  hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
 
   status = getaddrinfo(NULL, port, &hints, &servinfo);
   gai_handler[(status != 0)](status);
@@ -86,6 +83,7 @@ static int get_listener_socket(const char *port) {
     ctx.state = (is_error & ctx.state);
     keep_running = (is_error & ctx.state);
   }
+  freeaddrinfo(servinfo);
   ctx.actions = New_Listener_action_table;
   ctx.actions[ctx.state](&ctx);
 
@@ -93,7 +91,6 @@ static int get_listener_socket(const char *port) {
 
   ctx.state = abs(listen(ctx.fd, MAX_BACKLOG));
   ctx.actions[ctx.state](&ctx);
-  freeaddrinfo(servinfo);
 
   return ctx.fd;
 }
@@ -140,7 +137,7 @@ static void accept_fcntl_action_failed(AcceptFlagManipulationContext *ctx) {
 // non blocking function to accept incoming connection and return fd on success and -1 on err
 // NOTE: if i use this function i need to also detect whether the connection is closed to then
 // remove that file descriptor
-static int accept_incoming_connection(int listener) {
+int accept_incoming_connection(int listener) {
   struct sockaddr_storage their_addr;
 
   AcceptFlagManipAction actions_table[] = {
