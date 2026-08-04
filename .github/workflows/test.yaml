@@ -18,4 +18,4 @@ jobs:
           version: master
 
       - name: build test bin
-        uses: zig build test --summary all
+        run: zig build test --summary all
