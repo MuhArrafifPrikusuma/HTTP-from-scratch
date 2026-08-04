@@ -15,9 +15,6 @@ int main(int argc, char *argv[]) {
 
   while (1) {
     int test = accept_incoming_connection(listener_fd);
-    if (test == -1) {
-      continue;
-    }
     printf("accepted fd: %d\n", test);
   }
 

@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: mlugg/setup-zig@v1
         with:
-          version: 0.16.0
+          version: master
 
       - name: build test bin
         uses: zig build test --summary all
