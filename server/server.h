@@ -34,6 +34,7 @@ struct EpollContext {
 
 int get_listener_socket(const char *port);
 int accept_incoming_connection(int listener);
+int init_epoll_fd();
 
 static nerrh_ft *gai_handler[2];
 

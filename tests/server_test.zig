@@ -7,15 +7,21 @@ var fd: c_int = 0;
 // it will throw failed command because it's
 // getting hijacked by the new socket we opened in this function but it's completely fine
 // as long as we use --summary all
-test "(server C) get_listener_socket" {
+test "server C get_listener_socket" {
     fd = c.get_listener_socket("0");
 
     try std.testing.expect(fd >= 0);
 }
 
 // NOTE: create mock server later to test an actual client connection too
-test "(server C) accept_incoming_connection" {
+test "server C accept_incoming_connection" {
     const connection_fd = c.accept_incoming_connection(fd);
 
     try std.testing.expect(connection_fd == -1);
+}
+
+test "server C init_epoll_fd" {
+    const efd = c.init_epoll_fd();
+
+    try std.testing.expect(efd != 0);
 }
