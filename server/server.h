@@ -3,7 +3,6 @@
 
 #define MAX_BACKLOG 2000
 
-#include "../include/common.h"
 #include "server_error.h"
 #include <netdb.h>
 
@@ -25,6 +24,9 @@ struct AcceptFlagManipulationContext {
   int returnValue;
 };
 
-nerrh_ft *gai_handler[2];
+int get_listener_socket(const char *port);
+int accept_incoming_connection(int listener);
+
+static nerrh_ft *gai_handler[2];
 
 #endif // !SERVER_H
