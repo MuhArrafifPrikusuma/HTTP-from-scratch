@@ -1,5 +1,10 @@
 #include "server.h"
-#include <netdb.h>
+#include <bits/types/sigset_t.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/epoll.h>
+#include <time.h>
 
 int get_listener_socket(const char *port);
 static int sendall(int fd, const char *restrict buf, size_t *len);
@@ -33,7 +38,8 @@ static int handle_Listener_error(ListenerLoopContext *ctx) {
   _exit(1);
 }
 
-// take provided port from argv return listener fd when success and crash when failed
+// take provided port from argv return listener fd when success and crash when
+// failed
 int get_listener_socket(const char *port) {
   struct addrinfo hints, *servinfo;
   int status;
@@ -66,7 +72,8 @@ int get_listener_socket(const char *port) {
 
   int keep_running = 1;
   while (keep_running) {
-    ctx.fd = socket(ctx.info->ai_family, ctx.info->ai_socktype | SOCK_NONBLOCK | SOCK_CLOEXEC,
+    ctx.fd = socket(ctx.info->ai_family,
+                    ctx.info->ai_socktype | SOCK_NONBLOCK | SOCK_CLOEXEC,
                     ctx.info->ai_protocol);
 
     size_t valid_mask = ~((size_t)(ctx.fd >> (sizeof(ssize_t) * 8 - 1)));
@@ -92,8 +99,9 @@ int get_listener_socket(const char *port) {
   return ctx.fd;
 }
 
-// make sure to send all data without failing, this will change *len to the total size that was send
-// successfully to later use to see how many actually get send if fails and will return -1 if err
+// make sure to send all data without failing, this will change *len to the
+// total size that was send successfully to later use to see how many actually
+// get send if fails and will return -1 if err
 static int sendall(int fd, const char *restrict buf, size_t *len) {
   size_t total_sent = 0;
   size_t target_len = *len;
@@ -110,7 +118,8 @@ static int sendall(int fd, const char *restrict buf, size_t *len) {
     size_t is_valid = (valid_mask & 1);
     size_t bytes_left_mask = (bytes_left > 0);
 
-    // both valid mask and bytes_left_mask must succeed or else we add 0 to total_sent
+    // both valid mask and bytes_left_mask must succeed or else we add 0 to
+    // total_sent
     size_t combine_mask = valid_mask & -(bytes_left_mask);
     size_t clean_n = (size_t)n & combine_mask;
 
@@ -131,10 +140,10 @@ static void accept_fcntl_action_failed(AcceptFlagManipulationContext *ctx) {
   ctx->returnValue = -1;
 }
 
-// non blocking function to accept incoming connection and return fd on success and -1 on err
-// NOTE: if i use this function i need to also detect whether the connection is closed to then
-// remove that file descriptor
-int accept_incoming_connection(int listener) {
+// non blocking function to accept incoming connection and return fd on success
+// and -1 on err NOTE: if i use this function i need to also detect whether the
+// connection is closed to then remove that file descriptor
+int accept_incoming_connection(const int listener) {
   struct sockaddr_storage their_addr;
 
   AcceptFlagManipAction actions_table[] = {
@@ -158,6 +167,30 @@ int accept_incoming_connection(int listener) {
   valid_flag = ~((size_t)(ctx.flag >> (sizeof(ctx.flag) * 8 - 1)));
   is_success = (valid_flag & 1);
   ctx.actions[is_success](&ctx);
+
+  return ctx.returnValue;
+}
+
+static void epoll_fail(EpollContext *ctx) { ctx->returnValue = -1; }
+static void epoll_success(EpollContext *ctx) { ctx->returnValue = ctx->efd; }
+
+// create new epoll file descriptor, will return file descriptor on success and
+// -1 on failure
+int init_epoll_fd() {
+  EpollAction action_table[] = {
+      epoll_fail,
+      epoll_success,
+  };
+  EpollContext ctx;
+  ctx.returnValue = 0;
+  ctx.keep_running = 1;
+  ctx.efd = 0;
+  ctx.actions = action_table;
+
+  ctx.efd = epoll_create1(EPOLL_CLOEXEC);
+  size_t valid_flag = ~((size_t)(ctx.efd >> (sizeof(int) * 8 - 1)));
+  size_t is_valid = (valid_flag & 1);
+  ctx.actions[is_valid](&ctx);
 
   return ctx.returnValue;
 }

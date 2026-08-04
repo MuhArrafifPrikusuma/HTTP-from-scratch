@@ -14,7 +14,7 @@ test "(server C) get_listener_socket" {
 }
 
 // NOTE: create mock server later to test an actual client connection too
-test "(Server C) accept_incoming_connection" {
+test "(server C) accept_incoming_connection" {
     const connection_fd = c.accept_incoming_connection(fd);
 
     try std.testing.expect(connection_fd == -1);
