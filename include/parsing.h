@@ -8,6 +8,7 @@ static inline int parse_status(const char *s) {
 }
 
 // Parse status code string and return ResponseType on success and -1 on failure
+// chnge this to non conditional statement using array or something
 static inline ResponseType STATUS_CODE(const char *s) {
   int code = parse_status(s);
   switch (code) {
