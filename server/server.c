@@ -1,26 +1,51 @@
 #include "server.h"
 #include <bits/types/sigset_t.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
-#include <time.h>
+#include <unistd.h>
 
-int get_listener_socket(const char *port);
 static int sendall(int fd, const char *restrict buf, size_t *len);
-int accept_incoming_connection(int listener);
 
 #ifndef TESTING
 
 int main(int argc, char *argv[]) {
+  sigset_t blocksig;
+  sigemptyset(&blocksig);
+  sigaddset(&blocksig, SIGINT);
+
+  pthread_sigmask(SIG_BLOCK, &blocksig, NULL);
+  signal(SIGPIPE, SIG_IGN);
+
   char *PORT = get_port(argc, argv);
   printf("PORT: %s\n", PORT);
+  struct epoll_event *events = malloc(sizeof(struct epoll_event) * MAX_EVENTS);
+
+  ConnectionContext ctx[MAX_CONNECTION];
 
   int listener_fd = get_listener_socket(PORT);
 
+  int epfd = init_epoll_fd();
+  if (epfd == -1) {
+    fprintf(stderr, "failed to create new epoll fd\n");
+    return EXIT_FAILURE;
+  }
+  printf("epfd: %d\n", epfd);
+
   while (1) {
-    int test = accept_incoming_connection(listener_fd);
-    printf("accepted fd: %d\n", test);
+    int client_fd = accept_incoming_connection(listener_fd);
+    ctx[client_fd].fd = client_fd;
+    if (client_fd == -1) {
+      continue;
+    }
+    printf("%d\n", client_fd);
+    size_t num_events = epoll_add_events(ctx[client_fd].fd, epfd, events);
+    if (num_events == -1)
+      continue;
+    printf("is success: %d\n", (int)num_events);
   }
 
   EXIT_SUCCESS;
@@ -172,7 +197,7 @@ int accept_incoming_connection(const int listener) {
 }
 
 static void epoll_fail(EpollContext *ctx) { ctx->returnValue = -1; }
-static void epoll_success(EpollContext *ctx) { ctx->returnValue = ctx->efd; }
+static void epoll_success(EpollContext *ctx) { ctx->returnValue = ctx->val; }
 
 // create new epoll file descriptor, will return file descriptor on success and
 // -1 on failure
@@ -184,13 +209,47 @@ int init_epoll_fd() {
   EpollContext ctx;
   ctx.returnValue = 0;
   ctx.keep_running = 1;
-  ctx.efd = 0;
+  ctx.val = 0;
   ctx.actions = action_table;
 
-  ctx.efd = epoll_create1(EPOLL_CLOEXEC);
-  size_t valid_flag = ~((size_t)(ctx.efd >> (sizeof(int) * 8 - 1)));
+  ctx.val = epoll_create1(EPOLL_CLOEXEC);
+  size_t valid_flag = ~((size_t)(ctx.val >> (sizeof(int) * 8 - 1)));
   size_t is_valid = (valid_flag & 1);
   ctx.actions[is_valid](&ctx);
+
+  return ctx.returnValue;
+}
+
+int epoll_add_events(const int fd, const int epfd, struct epoll_event *events) {
+  EpollContext ctx;
+  ctx.val = 0;
+  ctx.returnValue = 0;
+
+  struct epoll_event ev;
+  ev.events = EPOLLIN | EPOLLOUT;
+  ev.data.fd = fd;
+
+  int epret = epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);
+  if (epret == -1) {
+    printf("nope this broken");
+  }
+  int is_success = (epret < 0);
+  ctx.returnValue = (is_success * -1) + ((1 - is_success) * epfd);
+
+  struct timespec timeout;
+  timeout.tv_nsec = 0;
+  timeout.tv_sec = 0;
+
+  sigset_t wait_mask;
+  sigemptyset(&wait_mask);
+
+  ctx.val =
+      epoll_pwait2(ctx.returnValue, events, MAX_EVENTS, &timeout, &wait_mask);
+  if (ctx.val == -1) {
+    printf("this broken\n");
+  }
+  is_success = (ctx.val < 0);
+  ctx.returnValue = (is_success * -1) + ((1 - is_success) * ctx.val);
 
   return ctx.returnValue;
 }

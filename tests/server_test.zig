@@ -3,25 +3,21 @@ const c = @cImport({
     @cInclude("../server/server.h");
 });
 
-var fd: c_int = 0;
 // it will throw failed command because it's
 // getting hijacked by the new socket we opened in this function but it's completely fine
 // as long as we use --summary all
 test "server C get_listener_socket" {
-    fd = c.get_listener_socket("0");
+    const listen_fd = c.get_listener_socket("0");
+    try std.testing.expect(listen_fd >= 0);
 
-    try std.testing.expect(fd >= 0);
-}
+    const epfd = c.init_epoll_fd();
+    try std.testing.expect(epfd != -1);
 
-// NOTE: create mock server later to test an actual client connection too
-test "server C accept_incoming_connection" {
-    const connection_fd = c.accept_incoming_connection(fd);
-
+    const connection_fd = c.accept_incoming_connection(listen_fd);
     try std.testing.expect(connection_fd == -1);
-}
 
-test "server C init_epoll_fd" {
-    const efd = c.init_epoll_fd();
+    var event_struct: [1024]c.epoll_event = undefined;
 
-    try std.testing.expect(efd != 0);
+    const num_of_events = c.epoll_add_events(2, epfd, &event_struct);
+    try std.testing.expect(num_of_events != -1);
 }
