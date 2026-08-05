@@ -23,8 +23,9 @@
 #define DEFAULT_PORT "8080"
 #define BUF_SIZE 10000
 #define MAX_PATH_LENGTH 512
-#define MAX_RECV_SIZE 1024
+#define MAX_RECV_SIZE 2048
 #define LOG_DIR "./log/server.log"
+#define MAX_CONNECTION 5000
 
 // HTTP response templates and status codes
 typedef enum {
@@ -68,7 +69,8 @@ extern const char *const CONNECTION_TEMPLATE[CONNECTION_COUNT];
 
 // inline functions
 
-// return socket internet address after assigning af_family to get that family address
+// return socket internet address after assigning af_family to get that family
+// address
 static inline void *get_addr_in(const struct sockaddr *addr) {
 
   // use byte offset to jump to sin_addr memory block
@@ -82,7 +84,8 @@ static inline void *get_addr_in(const struct sockaddr *addr) {
   return (void *)((const char *)addr + offset);
 }
 
-// this doesn't have any safety net and will not check whether the input is valid or not
+// this doesn't have any safety net and will not check whether the input is
+// valid or not
 static inline char *get_port(const int argc, char *argv[]) {
   which_Char_ft argv_func[3];
   argv_func[0] = if_argc_1;
