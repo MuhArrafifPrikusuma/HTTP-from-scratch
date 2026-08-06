@@ -1,16 +1,4 @@
 #include "server.h"
-#include <arpa/inet.h>
-#include <asm-generic/errno-base.h>
-#include <asm-generic/errno.h>
-#include <errno.h>
-#include <netinet/in.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 int get_listener_socket(const char *port) {
   struct addrinfo hints = {.ai_family = AF_UNSPEC,
@@ -61,12 +49,6 @@ int get_listener_socket(const char *port) {
   return listener_fd;
 }
 
-static void *get_inet_addr(const struct sockaddr *restrict addr) {
-  if (addr->sa_family == AF_INET)
-    return &(((struct sockaddr_in *)addr)->sin_addr);
-  return &(((struct sockaddr_in6 *)addr)->sin6_addr);
-}
-
 static EventFlags_t stripFlags(uint32_t *flags) {
   if (*flags & EPOLLRDHUP) {
     return HANG_UP;
@@ -89,9 +71,9 @@ static void Io_ReadHandler(ConnectionContext *restrict ctx) {
          ctx->read_buffer);
 }
 
-// create a test case for this later when i made the client
+// NOTE: create a test case for this later when i made the client
 int epoll_handler(const int listener_fd) {
-  IoActions_f act[] = {
+  IoActions_f trigger_action[] = {
       [READ_READY] = Io_ReadHandler,
       [WRITE_READY] = Io_WriteHandler,
   };
@@ -171,17 +153,20 @@ int epoll_handler(const int listener_fd) {
         // Use array of function pointers for this
         // Handle client I/O
         ConnectionContext *ctx = (ConnectionContext *)events[i].data.ptr;
-        uint32_t evf = events[i].events;
-        while (evf != 0) {
-          EventFlags_t ef = stripFlags(&evf);
-          printf("flag value: %d \n", evf);
+        uint32_t evfs = events[i].events;
+
+        while (evfs != 0) {
+          EventFlags_t ef = stripFlags(&evfs);
+
           if (ef == HANG_UP) {
-            printf("%s : fd: %d: hang up\n", ctx->ipstr, ctx->fd);
+            printf("%s%s : fd: %d: hang up %s\n", COLOR_RED, ctx->ipstr,
+                   ctx->fd, COLOR_RESET);
             close(ctx->fd);
             free(ctx);
             break;
           }
-          act[ef](ctx);
+
+          trigger_action[ef](ctx);
         }
       }
     }
