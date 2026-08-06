@@ -17,13 +17,3 @@ alignas(64) const char *const CONNECTION_HEADER[CONNECTION_COUNT] = {
     [CONNECTION_CLOSE] = "Connection: close\r\n",
     [CONNECTION_KEEP_ALIVE] = "Connection: keep-alive\r\n",
 };
-
-char *if_argc_1(char *arg[]) {
-  printf("No argument provided using fallback port\n");
-  return DEFAULT_PORT;
-}
-char *if_argc_2(char *arg[]) { return arg[1]; }
-char *if_argc_3(char *arg[]) {
-  fprintf(stderr, "Too many arguments!");
-  _exit(1);
-}
