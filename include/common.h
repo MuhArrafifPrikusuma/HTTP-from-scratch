@@ -65,6 +65,14 @@ extern const char *const CONTENT[CONTENT_COUNT];
 extern const char *const RESPONSE_TYPE[RESPONSE_COUNT];
 extern const char *const CONNECTION_TEMPLATE[CONNECTION_COUNT];
 
+// inline functions
+
+static inline void *get_inet_addr(const struct sockaddr *restrict addr) {
+  if (addr->sa_family == AF_INET)
+    return &(((struct sockaddr_in *)addr)->sin_addr);
+  return &(((struct sockaddr_in6 *)addr)->sin6_addr);
+}
+
 // Term text color
 #define COLOR_RED "\x1b[31m"
 #define COLOR_GREEN "\x1b[32m"
