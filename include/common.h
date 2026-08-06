@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <netdb.h>
 #include <signal.h>
 #include <stdalign.h>
@@ -22,8 +23,9 @@
 // Constant server config
 #define DEFAULT_PORT "8080"
 #define MAX_BUF_SIZE 2048
+#define MAX_READ 256
 #define MAX_PATH_LENGTH 512
-#define LOG_DIR "./log/server.log"
+#define LOG_DIR "../log/server.log"
 #define MAX_CONNECTION 5000
 
 // HTTP response templates and status codes

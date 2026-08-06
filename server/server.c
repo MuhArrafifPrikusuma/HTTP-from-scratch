@@ -1,10 +1,15 @@
 #include "server.h"
+#include <arpa/inet.h>
 #include <asm-generic/errno-base.h>
 #include <asm-generic/errno.h>
 #include <errno.h>
+#include <netinet/in.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/epoll.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 int get_listener_socket(const char *port) {
@@ -56,10 +61,44 @@ int get_listener_socket(const char *port) {
   return listener_fd;
 }
 
-static int Io_WriteHandler(const ConnectionContext *restrict ctx) {}
-static int Io_ReadHandler(const ConnectionContext *restrict ctx) {}
+static void *get_inet_addr(const struct sockaddr *restrict addr) {
+  if (addr->sa_family == AF_INET)
+    return &(((struct sockaddr_in *)addr)->sin_addr);
+  return &(((struct sockaddr_in6 *)addr)->sin6_addr);
+}
 
+static EventFlags_t stripFlags(uint32_t *flags) {
+  if (*flags & EPOLLRDHUP) {
+    return HANG_UP;
+  }
+  if (*flags & EPOLLOUT) {
+    *flags -= EPOLLOUT;
+    return WRITE_READY;
+  }
+  if (*flags & EPOLLIN) {
+    *flags -= EPOLLIN;
+    return READ_READY;
+  }
+  return HANG_UP;
+}
+
+static void Io_WriteHandler(ConnectionContext *restrict ctx) {}
+static void Io_ReadHandler(ConnectionContext *restrict ctx) {
+  ctx->read_bytes = read(ctx->fd, ctx->read_buffer, MAX_READ);
+  printf("read %zu bytes with value of\n%s\n", ctx->read_bytes,
+         ctx->read_buffer);
+}
+
+// create a test case for this later when i made the client
 int epoll_handler(const int listener_fd) {
+  IoActions_f act[] = {
+      [READ_READY] = Io_ReadHandler,
+      [WRITE_READY] = Io_WriteHandler,
+  };
+
+  struct sockaddr_storage client_addr;
+  socklen_t addr_size = sizeof client_addr;
+
   int epfd = epoll_create1(EPOLL_CLOEXEC);
   if (epfd == -1) {
     perror("epoll_create1");
@@ -87,15 +126,14 @@ int epoll_handler(const int listener_fd) {
       perror("epoll_wait");
       break;
     }
-    printf("test\n");
 
     for (int i = 0; i < nfds; i++) {
       ConnectionContext *ctx = events[i].data.ptr;
       // accept new connection on first iteration always
       if (ctx->is_listener) {
         while (1) {
-          int client_fd =
-              accept4(listener_fd, NULL, NULL, SOCK_NONBLOCK | SOCK_CLOEXEC);
+          int client_fd = accept4(listener_fd, (struct sockaddr *)&client_addr,
+                                  &addr_size, SOCK_NONBLOCK | SOCK_CLOEXEC);
           if (client_fd < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
               break;
@@ -112,11 +150,16 @@ int epoll_handler(const int listener_fd) {
           client_ctx->is_listener = false;
 
           struct epoll_event client_ev = {
-              .events = EPOLLIN | EPOLLET | EPOLLRDHUP,
+              .events = EPOLLIN | EPOLLOUT | EPOLLET | EPOLLRDHUP,
               .data.ptr = client_ctx // Store pointer to context
           };
-          printf("client connected to: %d\n", client_ctx->fd);
+          inet_ntop(client_addr.ss_family,
+                    get_inet_addr((struct sockaddr *)&client_addr),
+                    client_ctx->ipstr, sizeof client_ctx->ipstr);
 
+          // NOTE: replace this with the logger function later
+          printf("%s connected\nflags: %" PRIu32 "\nfd: %d\n",
+                 client_ctx->ipstr, client_ev.events, client_fd);
           // add newly created epoll instance from the client
           if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_fd, &client_ev) < 0) {
             perror("epoll_ctl: server");
@@ -128,14 +171,18 @@ int epoll_handler(const int listener_fd) {
         // Use array of function pointers for this
         // Handle client I/O
         ConnectionContext *ctx = (ConnectionContext *)events[i].data.ptr;
-        // Read/Write operations...
-
-        printf("what flag: %d\n", events[i].events);
-        printf("%d\n", ctx->fd);
-        // On disconnect or error:
-        // epoll_ctl(epfd, EPOLL_CTL_DEL, ctx->fd, NULL);
-        // close(ctx->fd);
-        // free(ctx);
+        uint32_t evf = events[i].events;
+        while (evf != 0) {
+          EventFlags_t ef = stripFlags(&evf);
+          printf("flag value: %d \n", evf);
+          if (ef == HANG_UP) {
+            printf("%s : fd: %d: hang up\n", ctx->ipstr, ctx->fd);
+            close(ctx->fd);
+            free(ctx);
+            break;
+          }
+          act[ef](ctx);
+        }
       }
     }
   }
