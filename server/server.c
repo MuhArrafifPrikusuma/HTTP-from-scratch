@@ -1,4 +1,7 @@
 #include "server.h"
+#include <stddef.h>
+#include <stdio.h>
+#include <unistd.h>
 
 int get_listener_socket(const char *port) {
   struct addrinfo hints = {.ai_family = AF_UNSPEC,
@@ -64,8 +67,15 @@ static EventFlags_t stripFlags(uint32_t *flags) {
   return HANG_UP;
 }
 
-static void Io_WriteHandler(ConnectionContext *restrict ctx) {}
-static void Io_ReadHandler(ConnectionContext *restrict ctx) {
+static void Io_Writer(ConnectionContext *restrict ctx) {
+  ctx->write_buffer = "hello world!";
+  size_t bufSize = strlen(ctx->write_buffer);
+
+  ctx->write_bytes = write(ctx->fd, ctx->write_buffer, bufSize);
+  printf("write %zu bytes with value of\n%s\n", ctx->write_bytes,
+         ctx->write_buffer);
+}
+static void Io_Reader(ConnectionContext *restrict ctx) {
   ctx->read_bytes = read(ctx->fd, ctx->read_buffer, MAX_READ);
   printf("read %zu bytes with value of\n%s\n", ctx->read_bytes,
          ctx->read_buffer);
@@ -74,8 +84,8 @@ static void Io_ReadHandler(ConnectionContext *restrict ctx) {
 // NOTE: create a test case for this later when i made the client
 int epoll_handler(const int listener_fd) {
   IoActions_f trigger_action[] = {
-      [READ_READY] = Io_ReadHandler,
-      [WRITE_READY] = Io_WriteHandler,
+      [READ_READY] = Io_Reader,
+      [WRITE_READY] = Io_Writer,
   };
 
   struct sockaddr_storage client_addr;
