@@ -12,7 +12,7 @@ const DeviceInfo = struct {
     HostAddrAndPort: [*:0]c_char,
     UserAgent: [*:0]c_char,
 };
-const Accepts = struct {
+const Acc = struct {
     Accept: [*:0]c_char,
     AcceptLanguange: [*:0]c_char,
     AcceptEncoding: [*:0]c_char,
