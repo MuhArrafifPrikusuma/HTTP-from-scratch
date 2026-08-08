@@ -7,11 +7,14 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <math.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <signal.h>
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,7 +24,7 @@
 #include <unistd.h>
 
 // Constant server config
-#define DEFAULT_PORT "8080"
+#define DEFAULT_PORT "0"
 #define MAX_BUF_SIZE 2048
 #define MAX_READ 256
 #define MAX_PATH_LENGTH 512
@@ -55,11 +58,6 @@ typedef enum {
   CONNECTION_UNKNOWN = -1
 } ConnectionType;
 
-// helper for local function
-char *if_argc_1(char *arg[]);
-char *if_argc_2(char *arg[]);
-char *if_argc_3(char *arg[]);
-
 // Arrays lookups
 extern const char *const CONTENT[CONTENT_COUNT];
 extern const char *const RESPONSE_TYPE[RESPONSE_COUNT];
@@ -67,10 +65,39 @@ extern const char *const CONNECTION_TEMPLATE[CONNECTION_COUNT];
 
 // inline functions
 
+// Find the family of addr and return addr with their family format
 static inline void *get_inet_addr(const struct sockaddr *restrict addr) {
   if (addr->sa_family == AF_INET)
     return &(((struct sockaddr_in *)addr)->sin_addr);
   return &(((struct sockaddr_in6 *)addr)->sin6_addr);
+}
+
+static inline uint16_t
+get_inet_port(const struct sockaddr_storage *restrict addr) {
+  if (addr->ss_family == AF_INET) {
+    struct sockaddr_in *s = (struct sockaddr_in *)addr;
+    return s->sin_port;
+  }
+  struct sockaddr_in6 *s = (struct sockaddr_in6 *)addr;
+  return s->sin6_port;
+}
+
+static inline int getInt(const char *chars, const size_t strlen,
+                         const int base) {
+
+  uint val = 0;
+  for (int i = 0; i < strlen; i++) {
+    uint tmp_val = 0;
+    tmp_val = chars[i] - '0';
+
+    if (tmp_val < 0 || tmp_val > 9) {
+      fprintf(stderr, "%d: %c is not a number\n", i, chars[i]);
+      _exit(EXIT_FAILURE);
+    }
+
+    val += tmp_val * (pow(base, strlen - i - 1));
+  }
+  return val;
 }
 
 // Term text color

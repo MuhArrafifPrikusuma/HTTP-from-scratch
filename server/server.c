@@ -1,17 +1,39 @@
 #include "server.h"
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
+static uint16_t get_port(const int listener_fd) {
+  struct sockaddr_storage tmp_addr;
+  socklen_t addr_len = sizeof tmp_addr;
+
+  if (getsockname(listener_fd, (struct sockaddr *)&tmp_addr, &addr_len) < 0) {
+    perror("getsockname");
+    _exit(EXIT_FAILURE);
+  }
+  uint16_t new_port;
+  new_port = ntohs(get_inet_port(&tmp_addr));
+  return new_port;
+}
+
 int get_listener_socket(const char *port) {
-  struct addrinfo hints = {.ai_family = AF_UNSPEC,
-                           .ai_socktype = SOCK_STREAM,
-                           .ai_flags = AI_PASSIVE | AI_NUMERICSERV};
-  struct addrinfo *servinfo, *p;
+  struct addrinfo hints, *servinfo, *p;
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE;
 
   if (getaddrinfo(NULL, port, &hints, &servinfo) != 0) {
     perror("getaddrinfo");
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
   }
 
   int listener_fd = -1;
@@ -21,6 +43,7 @@ int get_listener_socket(const char *port) {
     listener_fd =
         socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK | SOCK_CLOEXEC,
                p->ai_protocol);
+
     if (listener_fd < 0)
       continue;
 
@@ -38,16 +61,27 @@ int get_listener_socket(const char *port) {
 
   if (listener_fd < 0) {
     fprintf(stderr, "Failed to bind listener socket\n");
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
   }
+
+  size_t port_len = strlen(port);
+  uint16_t new_port = 0;
+  char ipstr[INET6_ADDRSTRLEN];
+
+  memset(&new_port, 0, sizeof new_port);
+  if (port_len < 4) {
+    new_port = get_port(listener_fd);
+  } else
+    new_port = getInt(port, port_len, 10);
 
   if (listen(listener_fd, MAX_BACKLOG) < 0) {
     perror("listen");
     close(listener_fd);
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
   }
+  inet_ntop(p->ai_family, p->ai_addr, ipstr, sizeof ipstr);
 
-  printf("Server listening on port %s...\n", port);
+  printf("Server listening on port %s:%u...\n", ipstr, new_port);
 
   return listener_fd;
 }
@@ -67,9 +101,16 @@ static EventFlags_t stripFlags(uint32_t *flags) {
   return HANG_UP;
 }
 
+// make it later on so that it makes sure to read and send all of the data
+// without leaving anything
 static void Io_Writer(ConnectionContext *restrict ctx) {
   ctx->write_buffer = "hello world!";
   size_t bufSize = strlen(ctx->write_buffer);
+
+  if (bufSize > MAX_BUF_SIZE) {
+    ctx->write_bytes = -1;
+    return;
+  }
 
   ctx->write_bytes = write(ctx->fd, ctx->write_buffer, bufSize);
   printf("write %zu bytes with value of\n%s\n", ctx->write_bytes,
@@ -145,13 +186,14 @@ int epoll_handler(const int listener_fd) {
               .events = EPOLLIN | EPOLLOUT | EPOLLET | EPOLLRDHUP,
               .data.ptr = client_ctx // Store pointer to context
           };
+
           inet_ntop(client_addr.ss_family,
                     get_inet_addr((struct sockaddr *)&client_addr),
                     client_ctx->ipstr, sizeof client_ctx->ipstr);
 
           // NOTE: replace this with the logger function later
-          printf("%s connected\nflags: %" PRIu32 "\nfd: %d\n",
-                 client_ctx->ipstr, client_ev.events, client_fd);
+          printf("%s%s connected\nflags: %" PRIu32 "\nfd: %d%s\n", COLOR_GREEN,
+                 client_ctx->ipstr, client_ev.events, client_fd, COLOR_RESET);
           // add newly created epoll instance from the client
           if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_fd, &client_ev) < 0) {
             perror("epoll_ctl: server");
@@ -175,8 +217,9 @@ int epoll_handler(const int listener_fd) {
             free(ctx);
             break;
           }
-
           trigger_action[ef](ctx);
+          if (ctx->write_bytes == -1)
+            ; // idk what to put here
         }
       }
     }
@@ -193,7 +236,7 @@ int epoll_handler(const int listener_fd) {
 int main(int argc, char *argv[]) {
   signal(SIGPIPE, SIG_IGN);
 
-  const char *port = (argc > 1) ? argv[1] : "8080";
+  const char *port = (argc > 1) ? argv[1] : DEFAULT_PORT;
   int listener_fd = get_listener_socket(port);
 
   epoll_handler(listener_fd);
