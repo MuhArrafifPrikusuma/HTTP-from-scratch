@@ -68,7 +68,6 @@ int get_listener_socket(const char *port) {
   uint16_t new_port = 0;
   char ipstr[INET6_ADDRSTRLEN];
 
-  memset(&new_port, 0, sizeof new_port);
   if (port_len < 4) {
     new_port = get_port(listener_fd);
   } else
@@ -79,9 +78,8 @@ int get_listener_socket(const char *port) {
     close(listener_fd);
     _exit(EXIT_FAILURE);
   }
-  inet_ntop(p->ai_family, p->ai_addr, ipstr, sizeof ipstr);
 
-  printf("Server listening on port %s:%u...\n", ipstr, new_port);
+  printf("Server listening on port: %u...\n", new_port);
 
   return listener_fd;
 }

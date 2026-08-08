@@ -82,7 +82,7 @@ get_inet_port(const struct sockaddr_storage *restrict addr) {
   return s->sin6_port;
 }
 
-static inline int getInt(const char *chars, const size_t strlen,
+static inline int getInt(const char *restrict chars, const size_t strlen,
                          const int base) {
 
   uint val = 0;

@@ -7,6 +7,29 @@ const c = @cImport({
 // getting hijacked by the new socket we opened in this function but it's completely fine
 // as long as we use --summary all
 test "server C get_listener_socket" {
-    const listen_fd = c.get_listener_socket("0");
-    try std.testing.expect(listen_fd != -1);
+    const tc = struct {
+        port: [*:0]const u8,
+        expect: bool,
+    };
+
+    const tcs = [_]tc{
+        // NOTE: activate this later and use child process to test it
+        // .{
+        //     .port = "99999999",
+        //     .expect = false,
+        // },
+        .{
+            .port = "0",
+            .expect = true,
+        },
+        .{
+            .port = "0",
+            .expect = true,
+        },
+    };
+
+    for (tcs) |val| {
+        const is_success: bool = (c.get_listener_socket(val.port) != -1);
+        try std.testing.expect(is_success == val.expect);
+    }
 }
