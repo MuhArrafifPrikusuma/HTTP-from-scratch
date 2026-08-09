@@ -3,19 +3,28 @@ const std = @import("std");
 // method path and version
 // if some of this does not exist make it undefined so it's not going to effect when i
 // combined all of them
+const Cstring: type = [*:0]c_char;
 const MPVer = struct {
-    Method: [*:0]c_char,
-    Path: [*:0]c_char,
-    HTTPver: [*:0]c_char,
+    Method: []u8,
+    Path: []u8,
+    HTTPver: []u8,
 };
 const DeviceInfo = struct {
-    HostAddrAndPort: [*:0]c_char,
-    UserAgent: [*:0]c_char,
+    HostAddrAndPort: []u8,
+    UserAgent: []u8,
 };
 const Acc = struct {
-    Accept: [*:0]c_char,
-    AcceptLanguange: [*:0]c_char,
-    AcceptEncoding: [*:0]c_char,
+    Accept: []u8,
+    AcceptLanguange: []u8,
+    AcceptEncoding: []u8,
+};
+// after we parsed it store it here
+const HttpTemplate = struct {
+    MPV: MPVer,
+    DInfo: DeviceInfo,
+    Accepts: Acc,
+    // take all of those if undefined then deprecated else if it's filled we take those
+    fn buildString() !Cstring {}
 };
 
 const ParserErr = error{
