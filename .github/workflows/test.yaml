@@ -19,3 +19,6 @@ jobs:
 
       - name: build test bin
         run: zig build test --summary all
+
+      - name: build release bin test
+        run: zig build -Doptimize=ReleaseFast -DENABLE_NATIVE_ARCH=true
