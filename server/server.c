@@ -66,7 +66,6 @@ int get_listener_socket(const char *port) {
 
   size_t port_len = strlen(port);
   uint16_t new_port = 0;
-  char ipstr[INET6_ADDRSTRLEN];
 
   if (port_len < 4) {
     new_port = get_port(listener_fd);
@@ -216,7 +215,7 @@ int epoll_handler(const int listener_fd) {
             break;
           }
           trigger_action[ef](ctx);
-          if (ctx->write_bytes == -1)
+          if (ctx->write_bytes == (size_t)-1)
             ; // idk what to put here
         }
       }

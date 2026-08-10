@@ -35,7 +35,6 @@ pub fn build(b: *std.Build) void {
         .files = &.{
             "include/common.c",
             "server/server.c",
-            "server/server_error.c",
         },
         .flags = c_flags,
     });
