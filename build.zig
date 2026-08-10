@@ -13,9 +13,9 @@ pub fn build(b: *std.Build) void {
 
     // C specific compiler flags
     const c_flags: []const []const u8 = if (enable_native_arch)
-        &.{ "-std=c23", "-march=native" }
+        &.{ "-std=c23", "-march=native", "-Wall", "-Wextra", "-Wpedantic", "-Werror" }
     else
-        &.{"-std=c23"};
+        &.{ "-std=c23", "-Wall", "-Wextra", "-Wpedantic", "-Werror" };
 
     const server_exe = b.addExecutable(.{
         .name = "server",
