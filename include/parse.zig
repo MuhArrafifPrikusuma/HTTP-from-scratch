@@ -1,9 +1,7 @@
 const std = @import("std");
 
 // method path and version
-// if some of this does not exist make it undefined so it's not going to effect when i
-// combined all of them
-const Cstring: type = [*:0]c_char;
+const CString: type = [*:0]c_char;
 const MPVer = struct {
     Method: []u8,
     Path: []u8,
@@ -23,8 +21,10 @@ const HttpTemplate = struct {
     MPV: MPVer,
     DInfo: DeviceInfo,
     Accepts: Acc,
-    // take all of those if undefined then deprecated else if it's filled we take those
-    fn buildString() !Cstring {}
+    // take all of those and if undefined then deprecated else if it's filled we take those
+    fn buildString(self: HttpTemplate) []u8 {}
+    // convert the string that we just build into C compatible NULL terminated string
+    fn converToCstring(string: []u8, len: usize) CString {}
 };
 
 const ParserErr = error{
@@ -32,7 +32,7 @@ const ParserErr = error{
     no_request,
     unknown_len,
 };
-pub fn parseHTTP(bytes: [*:0]const c_char, bytes_len: c_uint) ParserErr!void {
+
+pub fn parseHTTP(bytes: CString, bytes_len: c_uint) ParserErr!void {
     // make this heap allocated later on
-    const bytes_safe = @as([bytes_len]u8, bytes);
 }
