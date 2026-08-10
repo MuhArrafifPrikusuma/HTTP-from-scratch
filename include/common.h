@@ -86,7 +86,7 @@ static inline int getInt(const char *restrict chars, const size_t strlen,
                          const int base) {
 
   uint val = 0;
-  for (int i = 0; i < strlen; i++) {
+  for (int i = 0; i < (int)strlen; i++) {
     uint tmp_val = 0;
     tmp_val = chars[i] - '0';
 
