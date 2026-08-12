@@ -3,6 +3,7 @@
 #define _GNU_SOURCE
 // idk why but i just feel like i need to make this without a single conditional
 // statement
+#include "../include/global.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -26,7 +27,7 @@
 // Constant server config
 #define DEFAULT_PORT "0"
 #define MAX_BUF_SIZE 2048
-#define MAX_READ 256
+#define MAX_READ 4096
 #define MAX_PATH_LENGTH 512
 #define LOG_DIR "../log/server.log"
 #define MAX_CONNECTION 5000

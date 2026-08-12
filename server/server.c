@@ -230,7 +230,7 @@ int epoll_handler(const int listener_fd) {
 
 #ifndef TESTING
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[], char **envp) {
   signal(SIGPIPE, SIG_IGN);
 
   const char *port = (argc > 1) ? argv[1] : DEFAULT_PORT;
