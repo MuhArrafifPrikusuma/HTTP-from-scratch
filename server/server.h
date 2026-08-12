@@ -16,7 +16,7 @@ typedef struct ConnectionContext ConnectionContext;
 typedef int (*ConnectionAction)(ConnectionContext *);
 struct ConnectionContext {
   char *write_buffer;
-  char read_buffer[MAX_BUF_SIZE];
+  char read_buffer[MAX_READ];
   size_t read_bytes;
   size_t write_bytes;
   char ipstr[INET6_ADDRSTRLEN];

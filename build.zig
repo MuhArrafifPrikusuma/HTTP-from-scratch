@@ -42,8 +42,8 @@ pub fn build(b: *std.Build) void {
     server_exe.use_llvm = true;
     server_exe.use_lld = true;
 
-    server_exe.root_module.addIncludePath(b.path("include"));
-    server_exe.root_module.addIncludePath(b.path("server"));
+    server_exe.root_module.addIncludePath(b.path("include/"));
+    server_exe.root_module.addIncludePath(b.path("server/"));
 
     b.installArtifact(server_exe);
 
@@ -75,4 +75,21 @@ pub fn build(b: *std.Build) void {
     const run_exe_tests = b.addRunArtifact(exe_tests);
     const test_step = b.step("test", "Run Unit tests");
     test_step.dependOn(&run_exe_tests.step);
+
+    // ZLS
+
+    const zls_check = b.addExecutable(.{
+        .name = "server",
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+
+    zls_check.root_module.addIncludePath(b.path("server/"));
+    zls_check.root_module.addIncludePath(b.path("include/"));
+
+    const check_step = b.step("check", "Make zls check this artifact");
+    check_step.dependOn(&zls_check.step);
 }
