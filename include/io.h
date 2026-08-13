@@ -1,8 +1,9 @@
 #ifndef IO_H
 #define IO_H
-#include "../server/server.h"
 
-void Writer(int32_t fd);
-void Reader(int32_t fd, size_t max_size);
+#include "common.h"
+
+// extern void Writer(int32_t fd);
+extern void *Reader(int32_t fd);
 
 #endif // !IO_H
