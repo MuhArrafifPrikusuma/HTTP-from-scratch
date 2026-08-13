@@ -1,7 +1,7 @@
 #ifndef PARSING_H
 #define PARSING_H
 
-#include "common.h"
+#include "../common.h"
 
 static inline int parse_status(const char *s) {
   return (s[0] - '0') * 100 + (s[1] - '0') * 10 + (s[2] - '0');

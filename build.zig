@@ -21,7 +21,7 @@ pub fn build(b: *std.Build) void {
         .linkage = .static,
         .name = "zlib",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("include/io.zig"),
+            .root_source_file = b.path("include/library/common.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
@@ -47,7 +47,6 @@ pub fn build(b: *std.Build) void {
         server_exe.root_module.unwind_tables = .none;
 
         if (optimize == .ReleaseFast or optimize == .ReleaseSmall) {
-            server_exe.root_module.single_threaded = true;
             server_exe.link_gc_sections = true;
 
             server_exe.root_module.stack_check = false;
@@ -72,8 +71,9 @@ pub fn build(b: *std.Build) void {
 
     server_exe.root_module.addIncludePath(b.path("include/"));
     server_exe.root_module.addIncludePath(b.path("server/"));
+    server_exe.root_module.addIncludePath(b.path("includel/library"));
+    server_exe.root_module.addImport("zlib", zlib.root_module);
 
-    server_exe.root_module.linkLibrary(zlib);
     b.installArtifact(server_exe);
 
     // test build
@@ -92,6 +92,7 @@ pub fn build(b: *std.Build) void {
 
     exe_tests.root_module.addIncludePath(b.path("include"));
     exe_tests.root_module.addIncludePath(b.path("server"));
+    exe_tests.root_module.addIncludePath(b.path("include/library/"));
 
     exe_tests.root_module.addCSourceFiles(.{
         .files = &.{
@@ -117,6 +118,7 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
+
     zls_check.root_module.addCSourceFiles(.{
         .files = &.{
             "include/common.c",
@@ -124,10 +126,11 @@ pub fn build(b: *std.Build) void {
         },
         .flags = c_flags,
     });
-    zls_check.root_module.linkLibrary(zlib);
 
     zls_check.root_module.addIncludePath(b.path("server"));
     zls_check.root_module.addIncludePath(b.path("include"));
+    zls_check.root_module.addIncludePath(b.path("include/library/"));
+    zls_check.root_module.addImport("zlib", zlib.root_module);
 
     const check_step = b.step("check", "Make zls check this artifact");
     check_step.dependOn(&zls_check.step);

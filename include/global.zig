@@ -1,10 +1,8 @@
 const std = @import("std");
+const lib = @import("zlib");
 const c = @cImport({
-    @cInclude("../server/server.h");
+    @cInclude("server.h");
 });
-
-pub const Cstring: type = [*:0]const u8;
-pub var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
 
 pub fn main(init: std.process.Init) !void {
     _ = c.signal(c.SIGPIPE, c.SIG_IGN);
@@ -21,10 +19,10 @@ pub fn main(init: std.process.Init) !void {
     _ = c.epoll_handler(listener_fd);
 }
 
-fn findPort(args: []const [:0]const u8) Cstring {
-    if (args.len < 2) return @as(Cstring, "0");
+fn findPort(args: []const [:0]const u8) lib.Cstring {
+    if (args.len < 2) return @as(lib.Cstring, "0");
     for (args, 0..) |arg, i| {
-        if (i >= args.len - 1) return @as(Cstring, arg);
+        if (i >= args.len - 1) return @as(lib.Cstring, arg);
     }
-    return @as(Cstring, "0");
+    return @as(lib.Cstring, "0");
 }

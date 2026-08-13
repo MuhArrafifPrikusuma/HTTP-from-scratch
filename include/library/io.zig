@@ -1,21 +1,20 @@
 const std = @import("std");
-const g = @import("global.zig");
+const common = @import("common.zig");
 const c = @cImport({
     @cInclude("../include/common.h");
 });
 
-pub export fn Reader(fd: c_int, from_addr: g.Cstring) *anyopaque {
-    const allocator = g.arena.allocator();
-    const read_buf = allocator.alloc(u8, c.MAX_READ) catch unreachable;
+pub fn Reader(fd: c_int, from_addr: [*:0]const u8) *anyopaque {
+    var ctx = common.ReadContext.startContext(std.heap.smp_allocator) catch unreachable;
 
-    const bytes_read: usize = @intCast(c.read(fd, read_buf.ptr, c.MAX_READ));
+    const bytes_read: usize = @intCast(c.read(fd, &ctx.read_buf[0], c.MAX_READ));
 
     Print2(
         "read: {d} Bytes\nfrom: {s}\nContent: {s}\n",
-        .{ bytes_read, from_addr, read_buf },
+        .{ bytes_read, from_addr, ctx.read_buf },
     ) catch unreachable;
 
-    return read_buf.ptr;
+    return ctx;
 }
 
 // pub export fn Writer(fd: c_int) void {
