@@ -190,6 +190,7 @@ int epoll_handler(const int listener_fd) {
           // NOTE: replace this with the logger function later
           printf("%s%s connected\nflags: %" PRIu32 "\nfd: %d%s\n", COLOR_GREEN,
                  client_ctx->ipstr, client_ev.events, client_fd, COLOR_RESET);
+
           // add newly created epoll instance from the client
           if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_fd, &client_ev) < 0) {
             perror("epoll_ctl: server");

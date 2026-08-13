@@ -4,18 +4,18 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // cpu build option
+    // cpu build optional
     const enable_native_arch = b.option(
         bool,
         "ENABLE_NATIVE_ARCH",
         "Optimize for the build machine's CPU (-march=native)",
     ) orelse false;
 
-    // C specific compiler flags
+    // compiler flags
     const c_flags: []const []const u8 = if (enable_native_arch)
-        &.{ "-std=c23", "-march=native", "-Wall", "-Wextra", "-Wpedantic", "-Werror" }
+        &.{ "-std=c23", "-march=native", "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-fno-unwind-tables" }
     else
-        &.{ "-std=c23", "-Wall", "-Wextra", "-Wpedantic", "-Werror" };
+        &.{ "-std=c23", "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-fno-unwind-tables" };
 
     const zlib = b.addLibrary(.{
         .linkage = .static,
@@ -41,8 +41,14 @@ pub fn build(b: *std.Build) void {
     });
 
     // LTO configuration on the compile step
-    if (optimize == .ReleaseFast) {
-        server_exe.lto = .full;
+
+    if (optimize != .Debug) {
+        server_exe.root_module.strip = true;
+        server_exe.root_module.unwind_tables = .none;
+
+        if (optimize == .ReleaseFast) {
+            server_exe.lto = .full;
+        }
     }
 
     server_exe.root_module.addCSourceFiles(.{
