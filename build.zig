@@ -17,6 +17,19 @@ pub fn build(b: *std.Build) void {
     else
         &.{ "-std=c23", "-Wall", "-Wextra", "-Wpedantic", "-Werror" };
 
+    const zlib = b.addLibrary(.{
+        .linkage = .static,
+        .name = "zlib",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("include/io.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+
+    zlib.root_module.addIncludePath(b.path("include/"));
+
     const server_exe = b.addExecutable(.{
         .name = "server",
         .root_module = b.createModule(.{
@@ -46,6 +59,7 @@ pub fn build(b: *std.Build) void {
     server_exe.root_module.addIncludePath(b.path("include/"));
     server_exe.root_module.addIncludePath(b.path("server/"));
 
+    server_exe.root_module.linkLibrary(zlib);
     b.installArtifact(server_exe);
 
     // test build

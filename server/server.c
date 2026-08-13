@@ -114,9 +114,8 @@ static void Io_Writer(ConnectionContext *restrict ctx) {
          ctx->write_buffer);
 }
 static void Io_Reader(ConnectionContext *restrict ctx) {
-  ctx->read_bytes = read(ctx->fd, ctx->read_buffer, MAX_READ);
-  printf("read %zu bytes with value of\n%s\n", ctx->read_bytes,
-         ctx->read_buffer);
+  void *test = Reader(ctx->fd);
+  printf("is succes: %s\n", (char *)test);
 }
 
 // NOTE: create a test case for this later when i made the client
@@ -227,18 +226,3 @@ int epoll_handler(const int listener_fd) {
   close(epfd);
   return 0;
 }
-//
-// #ifndef TESTING
-//
-// int main(int argc, char *argv[]) {
-//   signal(SIGPIPE, SIG_IGN);
-//
-//   const char *port = (argc > 1) ? argv[1] : DEFAULT_PORT;
-//   int listener_fd = get_listener_socket(port);
-//
-//   epoll_handler(listener_fd);
-//
-//   return EXIT_SUCCESS;
-// }
-//
-// #endif /* ifndef TESTING */

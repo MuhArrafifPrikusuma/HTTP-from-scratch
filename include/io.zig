@@ -1,24 +1,18 @@
 const std = @import("std");
 const c = @cImport({
-    @cInclude("../server/server.h");
+    @cInclude("../include/common.h");
 });
+const g = @import("global.zig");
 
-fn readAll(fd: i32, allocator: std.mem.Allocator ) void {
-    var total_read: usize = 0;
-    var n: usize = 0;
+pub export fn Reader(fd: c_int) *anyopaque {
+    const allocator = g.arena.allocator();
 
-    while (1) {
-        n = c.read(fd, , __nbytes: usize)
-    }
+    const read_buf = allocator.alloc(u8, c.MAX_READ) catch unreachable;
+
+    const bytes_read: usize = @intCast(c.read(fd, read_buf.ptr, c.MAX_READ));
+    std.debug.print("this is what i read: {s}\ntotal {d} bytes\n", .{ read_buf, bytes_read });
+
+    return read_buf.ptr;
 }
 
-pub fn Reader(fd: c_int) void {
-    const arena = std.heap.ArenaAllocator.init(std.heap.MemoryPool([]u8));
-    const allocator = arena.allocator();
-    defer arena.deinit();
-
-    readAll(@as(i32, fd), allocator);
-
-
-}
-pub fn Writer(fd: c_int, max_size: usize) void {}
+// pub fn Writer(fd: c_int, max_size: usize) void {}
