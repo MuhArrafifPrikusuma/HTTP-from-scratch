@@ -126,11 +126,11 @@ pub fn build(b: *std.Build) void {
         },
         .flags = c_flags,
     });
-    zls_check.root_module.linkLibrary(zlib);
 
     zls_check.root_module.addIncludePath(b.path("server"));
     zls_check.root_module.addIncludePath(b.path("include"));
     zls_check.root_module.addIncludePath(b.path("include/library/"));
+    zls_check.root_module.addImport("zlib", zlib.root_module);
 
     const check_step = b.step("check", "Make zls check this artifact");
     check_step.dependOn(&zls_check.step);
