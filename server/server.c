@@ -29,7 +29,7 @@ int get_listener_socket(const char *port) {
   memset(&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
-  hints.ai_flags = AI_PASSIVE;
+  hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST | AI_NUMERICSERV;
 
   if (getaddrinfo(NULL, port, &hints, &servinfo) != 0) {
     perror("getaddrinfo");
@@ -114,8 +114,10 @@ static void Io_Writer(ConnectionContext *restrict ctx) {
          ctx->write_buffer);
 }
 static void Io_Reader(ConnectionContext *restrict ctx) {
-  void *test = Reader(ctx->fd);
-  printf("is succes: %s\n", (char *)test);
+  void *test = Reader(ctx->fd, ctx->ipstr);
+  printf("take this pointer later to another functions that need to read this: "
+         "%s\n",
+         (char *)test);
 }
 
 // NOTE: create a test case for this later when i made the client
