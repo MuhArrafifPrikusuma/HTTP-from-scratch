@@ -46,8 +46,16 @@ pub fn build(b: *std.Build) void {
         server_exe.root_module.strip = true;
         server_exe.root_module.unwind_tables = .none;
 
-        if (optimize == .ReleaseFast) {
+        if (optimize == .ReleaseFast or optimize == .ReleaseSmall) {
+            server_exe.root_module.single_threaded = true;
+            server_exe.link_gc_sections = true;
+
+            server_exe.root_module.stack_check = false;
+            server_exe.root_module.valgrind = false;
+            server_exe.discard_local_symbols = true;
+
             server_exe.lto = .full;
+            server_exe.dead_strip_dylibs = true;
         }
     }
 

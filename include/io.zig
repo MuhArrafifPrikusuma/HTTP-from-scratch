@@ -1,17 +1,16 @@
 const std = @import("std");
+const g = @import("global.zig");
 const c = @cImport({
     @cInclude("../include/common.h");
 });
-const g = @import("global.zig");
 
 pub export fn Reader(fd: c_int, from_addr: g.Cstring) *anyopaque {
     const allocator = g.arena.allocator();
-
     const read_buf = allocator.alloc(u8, c.MAX_READ) catch unreachable;
 
     const bytes_read: usize = @intCast(c.read(fd, read_buf.ptr, c.MAX_READ));
 
-    bPrint(
+    Print2(
         "read: {d} Bytes\nfrom: {s}\nContent: {s}\n",
         .{ bytes_read, from_addr, read_buf },
     ) catch unreachable;
@@ -19,14 +18,15 @@ pub export fn Reader(fd: c_int, from_addr: g.Cstring) *anyopaque {
     return read_buf.ptr;
 }
 
-// pub fn Writer(fd: c_int) void {
+// pub export fn Writer(fd: c_int) void {
 //     const allocator = g.arena.allocator();
 //     const write_buf = allocator.
 // }
 
 // lovely buffered print statement to print to stdout, this should
 // mainly be used for printing anything no more than 4 KB
-pub fn bPrint(comptime fmt: []const u8, args: anytype) !void {
+pub fn Print2(comptime fmt: []const u8, args: anytype) !void {
+    // spawn io thread
     var threaded = std.Io.Threaded.init_single_threaded;
     const io = threaded.io();
 
