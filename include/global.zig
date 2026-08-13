@@ -4,7 +4,7 @@ const c = @cImport({
 });
 
 pub const Cstring: type = [*:0]const u8;
-pub var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+pub var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
 
 pub fn main(init: std.process.Init) !void {
     _ = c.signal(c.SIGPIPE, c.SIG_IGN);
@@ -21,9 +21,10 @@ pub fn main(init: std.process.Init) !void {
     _ = c.epoll_handler(listener_fd);
 }
 
-fn findPort(args: []const [:0]const u8) [*:0]const u8 {
+fn findPort(args: []const [:0]const u8) Cstring {
+    if (args.len < 2) return @as(Cstring, "0");
     for (args, 0..) |arg, i| {
-        if (i >= args.len) return @as([*:0]const u8, arg);
+        if (i >= args.len - 1) return @as(Cstring, arg);
     }
-    return @as([*:0]const u8, "0");
+    return @as(Cstring, "0");
 }
