@@ -27,5 +27,6 @@ struct ConnectionContext {
 typedef void (*IoActions_f)(ConnectionContext *);
 
 int get_listener_socket(const char *port);
+int epoll_handler(const int listener_fd);
 
 #endif // !SERVER_H

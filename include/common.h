@@ -3,7 +3,6 @@
 #define _GNU_SOURCE
 // idk why but i just feel like i need to make this without a single conditional
 // statement
-#include "../include/global.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
