@@ -86,6 +86,7 @@ pub fn build(b: *std.Build) void {
         },
         .flags = &.{ "-std=c23", "-DTESTING" },
     });
+    exe_tests.root_module.linkLibrary(zlib);
 
     const run_exe_tests = b.addRunArtifact(exe_tests);
     const test_step = b.step("test", "Run Unit tests");
@@ -109,6 +110,7 @@ pub fn build(b: *std.Build) void {
         },
         .flags = c_flags,
     });
+    zls_check.root_module.linkLibrary(zlib);
 
     zls_check.root_module.addIncludePath(b.path("server"));
     zls_check.root_module.addIncludePath(b.path("include"));
