@@ -15,4 +15,7 @@ pub export fn Reader(fd: c_int) *anyopaque {
     return read_buf.ptr;
 }
 
-// pub fn Writer(fd: c_int, max_size: usize) void {}
+// pub fn Writer(fd: c_int) void {
+//     const allocator = g.arena.allocator();
+//     const write_buf = allocator.
+// }
