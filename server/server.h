@@ -1,7 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 #include "../include/common.h"
-#include "../include/io.h"
+#include "../include/library/common.h"
 
 #define MAX_BACKLOG 2000
 #define MAX_EVENTS 128
@@ -16,6 +16,7 @@ typedef struct ConnectionContext ConnectionContext;
 // write global action arrays based on what flag returned
 typedef int (*ConnectionAction)(ConnectionContext *);
 struct ConnectionContext {
+  void *reader_context;
   char *write_buffer;
   char read_buffer[MAX_READ];
   size_t read_bytes;

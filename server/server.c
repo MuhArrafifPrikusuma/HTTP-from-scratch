@@ -114,10 +114,10 @@ static void Io_Writer(ConnectionContext *restrict ctx) {
          ctx->write_buffer);
 }
 static void Io_Reader(ConnectionContext *restrict ctx) {
-  void *test = Reader(ctx->fd, ctx->ipstr);
+  // NOTE: free ctx->reader_context after write/ disconnect/ crash
+  ctx->reader_context = eReader(ctx->fd, ctx->ipstr);
   printf("take this pointer later to another functions that need to read this: "
-         "%s\n",
-         (char *)test);
+         "\n");
 }
 
 // NOTE: create a test case for this later when i made the client
