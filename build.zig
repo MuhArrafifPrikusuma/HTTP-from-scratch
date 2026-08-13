@@ -20,6 +20,7 @@ pub fn build(b: *std.Build) void {
     const server_exe = b.addExecutable(.{
         .name = "server",
         .root_module = b.createModule(.{
+            .root_source_file = b.path("include/global.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
@@ -81,14 +82,22 @@ pub fn build(b: *std.Build) void {
     const zls_check = b.addExecutable(.{
         .name = "server",
         .root_module = b.createModule(.{
+            .root_source_file = b.path("include/global.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
         }),
     });
+    zls_check.root_module.addCSourceFiles(.{
+        .files = &.{
+            "include/common.c",
+            "server/server.c",
+        },
+        .flags = c_flags,
+    });
 
-    zls_check.root_module.addIncludePath(b.path("server/"));
-    zls_check.root_module.addIncludePath(b.path("include/"));
+    zls_check.root_module.addIncludePath(b.path("server"));
+    zls_check.root_module.addIncludePath(b.path("include"));
 
     const check_step = b.step("check", "Make zls check this artifact");
     check_step.dependOn(&zls_check.step);

@@ -227,18 +227,18 @@ int epoll_handler(const int listener_fd) {
   close(epfd);
   return 0;
 }
-
-#ifndef TESTING
-
-int main(int argc, char *argv[]) {
-  signal(SIGPIPE, SIG_IGN);
-
-  const char *port = (argc > 1) ? argv[1] : DEFAULT_PORT;
-  int listener_fd = get_listener_socket(port);
-
-  epoll_handler(listener_fd);
-
-  return EXIT_SUCCESS;
-}
-
-#endif /* ifndef TESTING */
+//
+// #ifndef TESTING
+//
+// int main(int argc, char *argv[]) {
+//   signal(SIGPIPE, SIG_IGN);
+//
+//   const char *port = (argc > 1) ? argv[1] : DEFAULT_PORT;
+//   int listener_fd = get_listener_socket(port);
+//
+//   epoll_handler(listener_fd);
+//
+//   return EXIT_SUCCESS;
+// }
+//
+// #endif /* ifndef TESTING */
