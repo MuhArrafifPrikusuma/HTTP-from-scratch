@@ -9,7 +9,7 @@ pub const ReadContext = struct {
     arena: std.heap.ArenaAllocator,
     read_buf: [4096]u8,
 
-    pub fn startContext(backing_allocator: std.mem.Allocator) !*ReadContext {
+    pub fn init(backing_allocator: std.mem.Allocator) !*ReadContext {
         const returnContext = try backing_allocator.create(ReadContext);
 
         returnContext.arena = std.heap.ArenaAllocator.init(backing_allocator);
@@ -17,13 +17,14 @@ pub const ReadContext = struct {
 
         return returnContext;
     }
-    pub fn explodeContext(self: *ReadContext) !void {
+
+    pub fn explode(self: *ReadContext) !void {
         self.arena.deinit();
     }
 };
 
-export fn eReader(fd: c_int, from_addr: Cstring) *anyopaque {
-    return Io.Reader(fd, from_addr);
+export fn eReader(fd: c_int, from_addr: Cstring, ioptr: *anyopaque) *anyopaque {
+    return Io.Reader(fd, from_addr, ioptr);
 }
 
 test {

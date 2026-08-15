@@ -46,7 +46,7 @@ Netmask is basically in IPv4 it looks like this for example you have Class C add
 "192.23.12.0" and the netmask is "255.255.255.0" so you use bitwiese AND and then
 those mask will turn into the ip address back.
 
-[still stupid]Netmask in IPv6 like 2001:db8::/32, to be honest i'm fucking confuse
+Netmask in IPv6 like 2001:db8::/32, to be honest i'm fucking confuse
 with this IPv6 netmask i have no idea what the hell is this i will figure it out later
 
 ## Ports number

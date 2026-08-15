@@ -5,6 +5,7 @@ const c = @cImport({
 });
 
 pub fn main(init: std.process.Init) !void {
+    var io = init.io;
     _ = c.signal(c.SIGPIPE, c.SIG_IGN);
 
     const allocator = init.arena.allocator();
@@ -16,7 +17,7 @@ pub fn main(init: std.process.Init) !void {
 
     if (listener_fd < 0) unreachable;
 
-    _ = c.epoll_handler(listener_fd);
+    _ = c.epoll_handler(listener_fd, &io);
 }
 
 fn findPort(args: []const [:0]const u8) lib.Cstring {
