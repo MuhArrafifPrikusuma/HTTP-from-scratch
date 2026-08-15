@@ -13,9 +13,9 @@ pub fn build(b: *std.Build) void {
 
     // compiler flags
     const c_flags: []const []const u8 = if (enable_native_arch)
-        &.{ "-std=c23", "-march=native", "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-fno-unwind-tables" }
+        &.{ "-std=c23", "-march=native", "-Wall", "-Wextra", "-Wpedantic", "-Werror" }
     else
-        &.{ "-std=c23", "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-fno-unwind-tables" };
+        &.{ "-std=c23", "-Wall", "-Wextra", "-Wpedantic", "-Werror" };
 
     const zlib = b.addLibrary(.{
         .linkage = .static,
@@ -93,6 +93,7 @@ pub fn build(b: *std.Build) void {
     exe_tests.root_module.addIncludePath(b.path("include"));
     exe_tests.root_module.addIncludePath(b.path("server"));
     exe_tests.root_module.addIncludePath(b.path("include/library/"));
+    exe_tests.root_module.addImport("zlib", zlib.root_module);
 
     exe_tests.root_module.addCSourceFiles(.{
         .files = &.{

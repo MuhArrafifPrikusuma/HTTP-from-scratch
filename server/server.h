@@ -19,16 +19,15 @@ struct ConnectionContext {
   void *reader_context;
   char *write_buffer;
   char read_buffer[MAX_READ];
-  size_t read_bytes;
   size_t write_bytes;
   char ipstr[INET6_ADDRSTRLEN];
   int fd;
   bool is_listener;
 };
 
-typedef void (*IoActions_f)(ConnectionContext *);
+typedef void (*IoActions_f)(ConnectionContext *, void *);
 
 int get_listener_socket(const char *port);
-int epoll_handler(const int listener_fd);
+int epoll_handler(const int listener_fd, void *ioptr);
 
 #endif // !SERVER_H

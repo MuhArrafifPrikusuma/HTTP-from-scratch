@@ -100,7 +100,9 @@ static EventFlags_t stripFlags(uint32_t *flags) {
 
 // make it later on so that it makes sure to read and send all of the data
 // without leaving anything
-static void Io_Writer(ConnectionContext *restrict ctx) {
+static void Io_Writer(ConnectionContext *restrict ctx, void *io) {
+  (void)io;
+
   ctx->write_buffer = "hello world!";
   size_t bufSize = strlen(ctx->write_buffer);
 
@@ -113,15 +115,15 @@ static void Io_Writer(ConnectionContext *restrict ctx) {
   printf("write %zu bytes with value of\n%s\n", ctx->write_bytes,
          ctx->write_buffer);
 }
-static void Io_Reader(ConnectionContext *restrict ctx) {
+static void Io_Reader(ConnectionContext *restrict ctx, void *io) {
   // NOTE: free ctx->reader_context after write/ disconnect/ crash
-  ctx->reader_context = eReader(ctx->fd, ctx->ipstr);
+  ctx->reader_context = eReader(ctx->fd, ctx->ipstr, io);
   printf("take this pointer later to another functions that need to read this: "
          "\n");
 }
 
 // NOTE: create a test case for this later when i made the client
-int epoll_handler(const int listener_fd) {
+int epoll_handler(const int listener_fd, void *io) {
   IoActions_f trigger_action[] = {
       [READ_READY] = Io_Reader,
       [WRITE_READY] = Io_Writer,
@@ -216,7 +218,7 @@ int epoll_handler(const int listener_fd) {
             free(ctx);
             break;
           }
-          trigger_action[ef](ctx);
+          trigger_action[ef](ctx, io);
           if (ctx->write_bytes == (size_t)-1)
             ; // idk what to put here
         }
