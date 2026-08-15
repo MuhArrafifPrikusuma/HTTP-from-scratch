@@ -124,7 +124,7 @@ static void Io_Reader(ConnectionContext *restrict ctx, void *io) {
 
 // NOTE: create a test case for this later when i made the client
 int epoll_handler(const int listener_fd, void *io) {
-  IoActions_f trigger_action[] = {
+  IoAction_Vtable_t trigger_action[] = {
       [READ_READY] = Io_Reader,
       [WRITE_READY] = Io_Writer,
   };

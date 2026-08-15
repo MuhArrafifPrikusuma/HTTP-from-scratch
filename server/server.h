@@ -25,7 +25,7 @@ struct ConnectionContext {
   bool is_listener;
 };
 
-typedef void (*IoActions_f)(ConnectionContext *, void *);
+typedef void (*IoAction_Vtable_t)(ConnectionContext *, void *);
 
 int get_listener_socket(const char *port);
 int epoll_handler(const int listener_fd, void *ioptr);
