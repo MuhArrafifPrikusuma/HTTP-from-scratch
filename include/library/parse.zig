@@ -130,6 +130,7 @@ fn hostHandler(slice: *const []const u8, request: *HttpTemplate) void {
         std.debug.print("{any}\n", .{err});
         return;
     };
+    std.debug.print("extracted: {s}\n", .{host.?});
 
     request.*.routing.Host = host orelse null;
 }
@@ -216,7 +217,8 @@ fn getContent(slice: *const []const u8) ParserErr!?[]const u8 {
     if (iterContent.peek().?.len == 0) return null;
     if (iterContent.peek() == null) return ParserErr.FailedToExtractContent;
 
-    std.debug.print("extracted content: {s}\n", .{iterContent.next().?});
+    const content = iterContent.next();
+    std.debug.print("extracted content: {s}\n", .{content.?});
 
-    return iterContent.peek();
+    return content;
 }
