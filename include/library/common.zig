@@ -24,7 +24,7 @@ pub const ReadContext = struct {
         return self;
     }
 
-    pub fn destroy(self: *ReadContext) !void {
+    pub fn destroy(self: *ReadContext) void {
         const arena = self.arena;
         arena.deinit();
     }
