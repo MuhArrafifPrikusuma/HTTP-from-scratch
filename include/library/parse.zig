@@ -1,31 +1,32 @@
 const std = @import("std");
 const lib = @import("common.zig");
+const parser = @This();
 
 // method path and version
 const GeneralRouting = struct {
-    RequestLine: ?[]u8,
-    Host: ?[]u8,
-    Connection: ?[]u8,
-    Upgrade: ?[]u8,
+    RequestLine: ?[]const u8,
+    Host: ?[]const u8,
+    Connection: ?[]const u8,
+    Upgrade: ?[]const u8,
 };
 const ClientAgent = struct {
-    UserAgent: ?[]u8,
-    Accept: ?[]u8,
-    AcceptLanguage: ?[]u8,
-    AcceptEncoding: ?[]u8,
-    AcceptCharset: ?[]u8,
-    DNT: ?[]u8, // <- do not track
+    UserAgent: ?[]const u8,
+    Accept: ?[]const u8,
+    AcceptLanguage: ?[]const u8,
+    AcceptEncoding: ?[]const u8,
+    AcceptCharset: ?[]const u8,
+    DNT: ?[]const u8, // <- do not track
 };
 const Auth = struct {
-    Authorization: ?[]u8,
-    Cookie: ?[]u8,
-    ProxyAuthorization: ?[]u8,
+    Authorization: ?[]const u8,
+    Cookie: ?[]const u8,
+    ProxyAuthorization: ?[]const u8,
 };
 const ContentPayload = struct {
-    ContentType: ?[]u8,
-    ContentLenght: ?[]u8,
-    ContentEncoding: ?[]u8,
-    ContentLanguage: ?[]u8,
+    ContentType: ?[]const u8,
+    ContentLenght: ?[]const u8,
+    ContentEncoding: ?[]const u8,
+    ContentLanguage: ?[]const u8,
 };
 // after we parsed it store it here
 const HttpTemplate = struct {
@@ -33,6 +34,34 @@ const HttpTemplate = struct {
     client: ClientAgent,
     auth: Auth,
     payload: ContentPayload,
+    arena: std.heap.ArenaAllocator,
+
+    pub fn parseRequestLine(self: *HttpTemplate) void {
+        _ = self;
+    }
+
+    pub fn create(backing_allocator: std.mem.Allocator) !*HttpTemplate {
+        var arena = std.heap.ArenaAllocator.init(backing_allocator);
+        errdefer arena.deinit();
+
+        const allocator = arena.allocator();
+        const self = try allocator.create(HttpTemplate);
+
+        self.* = .{
+            .routing = undefined,
+            .client = undefined,
+            .auth = undefined,
+            .payload = undefined,
+            .arena = arena,
+        };
+
+        return self;
+    }
+
+    pub fn destroy(self: *HttpTemplate) void {
+        const arena = self.arena;
+        arena.deinit();
+    }
     // // take all of those and if undefined then deprecated else if it's filled we take those
     // fn buildString(self: *HttpTemplate) []u8 {}
     // // convert the string that we just build into C compatible NULL terminated string
@@ -44,27 +73,124 @@ const ParserErr = error{
     no_request,
     unknown_len,
     invalid_request,
+    FieldsNotFound,
 };
 
 pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) ParserErr!void {
     const bytes: *lib.ReadContext = @ptrCast(@alignCast(bytesPtr));
     defer bytes.destroy();
+
+    const request = parser.HttpTemplate.create(std.heap.smp_allocator) catch unreachable;
     _ = io;
 
-    _ = splitPayload(&bytes.read_buf);
+    parser.splitPayload(&bytes.readBuffer, request);
 }
 
-fn splitPayload(bytes: []u8) ?*HttpTemplate {
-    const request: ?*HttpTemplate = undefined;
-    var iter = std.mem.splitSequence(u8, bytes, "\r\n");
+fn splitPayload(bytes: *const []u8, request: *HttpTemplate) void {
+    var iter = std.mem.splitSequence(u8, bytes.*, "\r\n");
 
-    var i: u32 = 0;
+    var i: u16 = 0;
     while (true) : (i += 1) {
+        if (iter.peek() == null) break;
+
         const current = iter.next();
-        if (current.?.len == 0) break;
-        std.debug.print("{d}:{s}\nlen:{d}\n", .{ i, current.?, current.?.len });
+        if (i == 0) {
+            request.*.routing.RequestLine = current.?;
+            std.debug.print("this is request line: {s}\n", .{request.*.routing.RequestLine.?});
+            continue;
+        }
+
+        determineHeader(&current.?, request) catch unreachable;
     }
-    return request;
 }
 
-fn determineHeader() !void {}
+const knownHeader = [_][]const u8{
+    "Host",
+    "Connection",
+    "Upgrade",
+    "User",
+    "Accept",
+    "DNT",
+    "Authorization",
+    "Cookie",
+    "Content",
+    "Sec",
+};
+
+const whatHeader = *const fn (slice: *const []const u8, request: *HttpTemplate) void;
+
+fn hostHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("host: {s}\n", .{slice.*});
+}
+fn connectionHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("connection: {s}\n", .{slice.*});
+}
+fn upgradeHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("upgrade: {s}\n", .{slice.*});
+}
+fn agentHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("agent: {s}\n", .{slice.*});
+}
+fn acceptHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("accpet: {s}\n", .{slice.*});
+}
+fn DNTHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("DNT: {s}\n", .{slice.*});
+}
+fn authHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("auth: {s}\n", .{slice.*});
+}
+fn cookieHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("cookie: {s}\n", .{slice.*});
+}
+fn contentHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("content: {s}\n", .{slice.*});
+}
+fn secHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("sec: {s}\n", .{slice.*});
+}
+
+fn determineHeader(slice: *const []const u8, request: *HttpTemplate) error{UnknownFields}!void {
+    const jumpTable = [_]whatHeader{
+        &hostHandler,
+        &connectionHandler,
+        &upgradeHandler,
+        &agentHandler,
+        &acceptHandler,
+        &DNTHandler,
+        &authHandler,
+        &cookieHandler,
+        &contentHandler,
+        &secHandler,
+    };
+
+    const field = parser.getFields(slice) catch unreachable;
+    for (jumpTable, knownHeader) |jump, header| {
+        if (std.ascii.eqlIgnoreCase(header, field)) {
+            jump(slice, request);
+            break;
+        }
+    }
+}
+
+// get fields from the slice
+fn getFields(slice: *const []const u8) ParserErr![]const u8 {
+    var iter = std.mem.splitSequence(u8, slice.*, ":");
+    var tmp = std.mem.splitSequence(u8, iter.peek().?, "-");
+    if (tmp.peek() != null) iter = tmp;
+
+    const val = iter.next();
+    if (val == null)
+        return ParserErr.FieldsNotFound;
+    return val.?;
+}
