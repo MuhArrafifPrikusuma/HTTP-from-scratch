@@ -1,5 +1,6 @@
 const std = @import("std");
 const lib = @import("common.zig");
+const parser = @This();
 
 // method path and version
 const GeneralRouting = struct {
@@ -72,16 +73,17 @@ const ParserErr = error{
     no_request,
     unknown_len,
     invalid_request,
+    FieldsNotFound,
 };
 
 pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) ParserErr!void {
     const bytes: *lib.ReadContext = @ptrCast(@alignCast(bytesPtr));
     defer bytes.destroy();
 
-    const request = HttpTemplate.create(std.heap.smp_allocator) catch unreachable;
+    const request = parser.HttpTemplate.create(std.heap.smp_allocator) catch unreachable;
     _ = io;
 
-    _ = splitPayload(&bytes.readBuffer, request);
+    parser.splitPayload(&bytes.readBuffer, request);
 }
 
 fn splitPayload(bytes: *const []u8, request: *HttpTemplate) void {
@@ -94,20 +96,19 @@ fn splitPayload(bytes: *const []u8, request: *HttpTemplate) void {
         const current = iter.next();
         if (i == 0) {
             request.*.routing.RequestLine = current.?;
+            std.debug.print("this is request line: {s}\n", .{request.*.routing.RequestLine.?});
             continue;
         }
 
-        std.debug.print("contain:{s}\nlen:{d}\n", .{ current.?, current.?.len });
-        std.debug.print("{any}\n", .{@TypeOf(current.?)});
-        // _ = determineHeader(&current.?) catch unreachable;
+        determineHeader(&current.?, request) catch unreachable;
     }
 }
 
-const knownHeader = [_]u8{
+const knownHeader = [_][]const u8{
     "Host",
     "Connection",
     "Upgrade",
-    "User-Agent",
+    "User",
     "Accept",
     "DNT",
     "Authorization",
@@ -116,6 +117,80 @@ const knownHeader = [_]u8{
     "Sec",
 };
 
-// fn determineHeader(slice: *const []const u8) error{UnknownFields}!*HttpTemplate {
-//     _ = slice;
-// }
+const whatHeader = *const fn (slice: *const []const u8, request: *HttpTemplate) void;
+
+fn hostHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("host: {s}\n", .{slice.*});
+}
+fn connectionHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("connection: {s}\n", .{slice.*});
+}
+fn upgradeHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("upgrade: {s}\n", .{slice.*});
+}
+fn agentHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("agent: {s}\n", .{slice.*});
+}
+fn acceptHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("accpet: {s}\n", .{slice.*});
+}
+fn DNTHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("DNT: {s}\n", .{slice.*});
+}
+fn authHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("auth: {s}\n", .{slice.*});
+}
+fn cookieHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("cookie: {s}\n", .{slice.*});
+}
+fn contentHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("content: {s}\n", .{slice.*});
+}
+fn secHandler(slice: *const []const u8, request: *HttpTemplate) void {
+    _ = request;
+    std.debug.print("sec: {s}\n", .{slice.*});
+}
+
+fn determineHeader(slice: *const []const u8, request: *HttpTemplate) error{UnknownFields}!void {
+    const jumpTable = [_]whatHeader{
+        &hostHandler,
+        &connectionHandler,
+        &upgradeHandler,
+        &agentHandler,
+        &acceptHandler,
+        &DNTHandler,
+        &authHandler,
+        &cookieHandler,
+        &contentHandler,
+        &secHandler,
+    };
+
+    const field = parser.getFields(slice) catch unreachable;
+    for (jumpTable, knownHeader) |jump, header| {
+        if (std.ascii.eqlIgnoreCase(header, field)) {
+            jump(slice, request);
+            break;
+        }
+    }
+}
+
+// get fields from the slice
+fn getFields(slice: *const []const u8) ParserErr![]const u8 {
+    var iter = std.mem.splitSequence(u8, slice.*, ":");
+    var tmp = std.mem.splitSequence(u8, iter.peek().?, "-");
+    if (tmp.peek() != null) iter = tmp;
+
+    const val = iter.next();
+    if (val == null)
+        return ParserErr.FieldsNotFound;
+    return val.?;
+}
