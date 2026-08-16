@@ -7,7 +7,8 @@ pub const Cstring: type = [*:0]const u8;
 
 pub const ReadContext = struct {
     arena: std.heap.ArenaAllocator,
-    read_buf: [4096]u8,
+    buffer: [4096]u8,
+    readBuffer: []u8,
 
     pub fn create(backing_allocator: std.mem.Allocator) !*ReadContext {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
@@ -18,7 +19,8 @@ pub const ReadContext = struct {
 
         self.* = .{
             .arena = arena,
-            .read_buf = [_]u8{0} ** 4096,
+            .buffer = undefined,
+            .readBuffer = undefined,
         };
 
         return self;

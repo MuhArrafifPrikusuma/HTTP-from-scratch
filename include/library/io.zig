@@ -14,12 +14,13 @@ pub fn Reader(fd: c_int, from_addr: [*:0]const u8, ioptr: *anyopaque) *anyopaque
 
     var ctx = lib.ReadContext.create(std.heap.smp_allocator) catch unreachable;
 
-    const bytes_read: usize = @intCast(c.read(fd, &ctx.read_buf[0], c.MAX_READ));
+    const bytes_read: usize = @intCast(c.read(fd, &ctx.buffer[0], c.MAX_READ));
+    ctx.readBuffer = ctx.buffer[0..bytes_read];
     lib.Parse.parseHTTP(ctx, io) catch unreachable;
 
     stdout.print(
         "{s}read: {d} Bytes\nfrom: {s}\nContent:\n{s}{s}\n",
-        .{ c.COLOR_BLUE, bytes_read, from_addr, c.COLOR_RESET, ctx.read_buf },
+        .{ c.COLOR_BLUE, bytes_read, from_addr, c.COLOR_RESET, ctx.readBuffer },
     ) catch unreachable;
 
     stdout.flush() catch unreachable;
