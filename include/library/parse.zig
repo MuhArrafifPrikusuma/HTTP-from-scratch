@@ -74,13 +74,17 @@ const ParserErr = error{
     unknown_len,
     invalid_request,
     FieldsNotFound,
+    FailedToExtractContent,
 };
 
 pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) ParserErr!void {
     const bytes: *lib.ReadContext = @ptrCast(@alignCast(bytesPtr));
     defer bytes.destroy();
 
-    const request = parser.HttpTemplate.create(std.heap.smp_allocator) catch unreachable;
+    const request = parser.HttpTemplate.create(std.heap.smp_allocator) catch |err| {
+        std.debug.print("Failed to allocate memory for HttpTemplate: {any}\n", .{err});
+        return;
+    };
     _ = io;
 
     parser.splitPayload(&bytes.readBuffer, request);
@@ -120,8 +124,15 @@ const knownHeader = [_][]const u8{
 const whatHeader = *const fn (slice: *const []const u8, request: *HttpTemplate) void;
 
 fn hostHandler(slice: *const []const u8, request: *HttpTemplate) void {
-    _ = request;
     std.debug.print("host: {s}\n", .{slice.*});
+
+    const host = parser.getContent(slice) catch |err| {
+        std.debug.print("{any}\n", .{err});
+        return;
+    };
+    std.debug.print("extracted: {s}\n", .{host.?});
+
+    request.*.routing.Host = host orelse null;
 }
 fn connectionHandler(slice: *const []const u8, request: *HttpTemplate) void {
     _ = request;
@@ -174,7 +185,10 @@ fn determineHeader(slice: *const []const u8, request: *HttpTemplate) error{Unkno
         &secHandler,
     };
 
-    const field = parser.getFields(slice) catch unreachable;
+    const field = parser.getFields(slice) catch |err| {
+        std.debug.print("{any}\n", .{err});
+        return;
+    };
     for (jumpTable, knownHeader) |jump, header| {
         if (std.ascii.eqlIgnoreCase(header, field)) {
             jump(slice, request);
@@ -193,4 +207,18 @@ fn getFields(slice: *const []const u8) ParserErr![]const u8 {
     if (val == null)
         return ParserErr.FieldsNotFound;
     return val.?;
+}
+
+fn getContent(slice: *const []const u8) ParserErr!?[]const u8 {
+    var iterField = std.mem.splitSequence(u8, slice.*, ": ");
+    if (iterField.next() == null) return null;
+
+    var iterContent = std.mem.splitSequence(u8, iterField.next().?, "\r\n");
+    if (iterContent.peek().?.len == 0) return null;
+    if (iterContent.peek() == null) return ParserErr.FailedToExtractContent;
+
+    const content = iterContent.next();
+    std.debug.print("extracted content: {s}\n", .{content.?});
+
+    return content;
 }
