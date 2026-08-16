@@ -10,16 +10,23 @@ pub const ReadContext = struct {
     read_buf: [4096]u8,
 
     pub fn create(backing_allocator: std.mem.Allocator) !*ReadContext {
-        const returnContext = try backing_allocator.create(ReadContext);
+        var arena = std.heap.ArenaAllocator.init(backing_allocator);
+        errdefer arena.deinit();
 
-        returnContext.arena = std.heap.ArenaAllocator.init(backing_allocator);
-        @memset(&returnContext.read_buf, 0);
+        const allocator = arena.allocator();
+        const self = try allocator.create(ReadContext);
 
-        return returnContext;
+        self.* = .{
+            .arena = arena,
+            .read_buf = [_]u8{0} ** 4096,
+        };
+
+        return self;
     }
 
-    pub fn explode(self: *ReadContext) !void {
-        self.arena.deinit();
+    pub fn destroy(self: *ReadContext) void {
+        const arena = self.arena;
+        arena.deinit();
     }
 };
 

@@ -15,6 +15,7 @@ pub fn Reader(fd: c_int, from_addr: [*:0]const u8, ioptr: *anyopaque) *anyopaque
     var ctx = lib.ReadContext.create(std.heap.smp_allocator) catch unreachable;
 
     const bytes_read: usize = @intCast(c.read(fd, &ctx.read_buf[0], c.MAX_READ));
+    lib.Parse.parseHTTP(ctx, io) catch unreachable;
 
     stdout.print(
         "{s}read: {d} Bytes\nfrom: {s}\nContent:\n{s}{s}\n",
