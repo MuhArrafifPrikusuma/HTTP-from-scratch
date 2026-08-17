@@ -35,7 +35,6 @@ const HttpTemplate = struct {
     auth: Auth = undefined,
     payload: ContentPayload = undefined,
     arena: std.heap.ArenaAllocator,
-    child_allocator: std.mem.Allocator,
 
     pub fn parseRequestLine(self: *HttpTemplate) void {
         _ = self;
@@ -43,23 +42,25 @@ const HttpTemplate = struct {
 
     /// allocate to arena pointer
     pub fn init(child_allocator: std.mem.Allocator) !*HttpTemplate {
-        const ptr = try child_allocator.create(HttpTemplate);
-        ptr.* = .{
-            .child_allocator = child_allocator,
-            .arena = std.heap.ArenaAllocator.init(child_allocator),
+        var arena = std.heap.ArenaAllocator.init(child_allocator);
+        errdefer arena.deinit();
+
+        const allocator = arena.allocator();
+
+        const self = try allocator.create(HttpTemplate);
+
+        self.* = .{
+            .arena = arena,
             .client = undefined,
             .auth = undefined,
             .payload = undefined,
             .routing = undefined,
         };
-        return ptr;
+        return self;
     }
 
     pub fn deinit(self: *HttpTemplate) void {
-        const allocator = self.child_allocator;
         self.arena.deinit();
-
-        allocator.destroy(self);
     }
     // // take all of those and if undefined then deprecated else if it's filled we take those
     // fn buildString(self: *HttpTemplate) []u8 {}
