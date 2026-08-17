@@ -17,14 +17,14 @@ pub fn Reader(fd: c_int, from_addr: [*:0]const u8, ioptr: *anyopaque) !*anyopaqu
 
     const bytes_read: usize = @intCast(c.read(fd, &ctx.buffer[0], c.MAX_READ));
     ctx.readBuffer = try allocator.dupe(u8, ctx.buffer[0..bytes_read]);
-    try lib.Parse.parseHTTP(ctx, io);
 
     try stdout.print(
-        "{s}read: {d} Bytes\nfrom: {s}\nContent:\n{s}{s}\n",
-        .{ c.COLOR_BLUE, bytes_read, from_addr, c.COLOR_RESET, ctx.readBuffer },
+        "{s}read: {d} Bytes\nfrom: {s}\nContent:\n{s}",
+        .{ c.COLOR_BLUE, bytes_read, from_addr, c.COLOR_RESET },
     );
 
     try stdout.flush();
+    try lib.Parse.parseHTTP(ctx, io);
 
     return ctx;
 }

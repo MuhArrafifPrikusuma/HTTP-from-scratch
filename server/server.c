@@ -121,7 +121,8 @@ static void Io_Reader(ConnectionContext *restrict ctx, void *io) {
   if (ctx->reader_context == NULL)
     fprintf(stderr, "reader went wrong\n");
 
-  printf("take this pointer later to another functions that need to read this: "
+  printf("[NOTE]take this pointer later to another functions that need to read "
+         "this: "
          "\n");
 }
 

@@ -24,16 +24,17 @@ const Auth = struct {
 };
 const ContentPayload = struct {
     ContentType: ?[]const u8 = null,
-    ContentLenght: ?[]const u8 = null,
+    ContentLength: ?[]const u8 = null,
     ContentEncoding: ?[]const u8 = null,
     ContentLanguage: ?[]const u8 = null,
 };
 // after we parsed it store it here
 const HttpTemplate = struct {
-    routing: GeneralRouting = undefined,
-    client: ClientAgent = undefined,
-    auth: Auth = undefined,
-    payload: ContentPayload = undefined,
+    routing: GeneralRouting = .{},
+    client: ClientAgent = .{},
+    auth: Auth = .{},
+    payload: ContentPayload = .{},
+    body: ?[]const u8 = null,
     arena: std.heap.ArenaAllocator,
 
     pub fn parseRequestLine(self: *HttpTemplate) void {
@@ -51,10 +52,11 @@ const HttpTemplate = struct {
 
         self.* = .{
             .arena = arena,
-            .client = undefined,
-            .auth = undefined,
-            .payload = undefined,
-            .routing = undefined,
+            .body = null,
+            .client = .{},
+            .auth = .{},
+            .payload = .{},
+            .routing = .{},
         };
         return self;
     }
@@ -86,13 +88,14 @@ pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !void {
 
     _ = io;
 
-    parser.splitPayload(&bytes.readBuffer, request) catch |err| std.debug.print("{any}\n", .{err});
+    parser.splitPayload(bytes.readBuffer, request) catch |err| std.debug.print("{any}\n", .{err});
 }
 
-fn splitPayload(bytes: *const []u8, request: *HttpTemplate) !void {
-    var iter = std.mem.splitSequence(u8, bytes.*, "\r\n");
+fn splitPayload(bytes: []const u8, request: *HttpTemplate) !void {
+    var iter = std.mem.splitSequence(u8, bytes, "\r\n");
     const allocator = request.arena.allocator();
 
+    parser.getBody(bytes, "\r\n", request) catch |err| std.debug.print("body not found: {any}\n", .{err});
     var i: u16 = 0;
     while (true) : (i += 1) {
         if (iter.peek() == null) break;
@@ -100,17 +103,18 @@ fn splitPayload(bytes: *const []u8, request: *HttpTemplate) !void {
         const current = iter.next() orelse return;
         if (i == 0) {
             request.routing.RequestLine = try allocator.dupe(u8, current);
-            std.debug.print("this is request line: {s}\n", .{request.routing.RequestLine.?});
+            std.debug.print("[DEBUG]request line: {s}\n", .{request.routing.RequestLine.?});
             continue;
         }
 
-        determineHeader(current, request);
+        parser.determineHeader(current, request);
     }
+    std.debug.print("[DEBUG]body: {s}\n[DEBUG]body length: {d}\n", .{ request.body.?, request.body.?.len });
 }
 
-const whatHeader = *const fn (noalias slice: []const u8, request: *HttpTemplate) anyerror!void;
+const whatHeader = *const fn (slice: []const u8, request: *HttpTemplate) anyerror!void;
 
-fn hostHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
+fn hostHandler(slice: []const u8, request: *HttpTemplate) !void {
     const host = parser.getContent(slice) catch |err| {
         std.debug.print("{any}\n", .{err});
         return;
@@ -122,9 +126,9 @@ fn hostHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     const allocator = request.arena.allocator();
     request.routing.Host = try allocator.dupe(u8, host);
 
-    std.debug.print("extracted: {s}\n", .{request.routing.Host.?});
+    std.debug.print("[DEBUG]Host: {s}\n", .{request.routing.Host.?});
 }
-fn connectionHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
+fn connectionHandler(slice: []const u8, request: *HttpTemplate) !void {
     const conType = parser.getContent(slice) catch |err| {
         std.debug.print("{any}\n", .{err});
         return;
@@ -135,14 +139,14 @@ fn connectionHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     const allocator = request.arena.allocator();
     request.routing.Connection = try allocator.dupe(u8, conType);
 
-    std.debug.print("connection: {s}\n", .{request.routing.Connection.?});
+    std.debug.print("[DEBUG]connection: {s}\n", .{request.routing.Connection.?});
 }
 /// NOTE: not needed for now, maybe later
-fn upgradeHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
-    std.debug.print("upgrade: {s}\n", .{slice});
+fn upgradeHandler(slice: []const u8, request: *HttpTemplate) !void {
+    std.debug.print("[DEBUG]upgrade: {s}\n", .{slice});
     _ = request;
 }
-fn agentHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
+fn agentHandler(slice: []const u8, request: *HttpTemplate) !void {
     const agent = parser.getContent(slice) catch |err| {
         std.debug.print("{any}\n", .{err});
         return;
@@ -154,22 +158,22 @@ fn agentHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     const allocator = request.arena.allocator();
 
     request.client.UserAgent = try allocator.dupe(u8, agent);
-    std.debug.print("agent: {s}\n", .{request.client.UserAgent.?});
+    std.debug.print("[DEBUG]agent: {s}\n", .{request.client.UserAgent.?});
 }
 
 // NOTE: finish this later
-fn acceptHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
+fn acceptHandler(slice: []const u8, request: *HttpTemplate) !void {
     const possibleValues = [_][]const u8{
         "Accept",
-        "Languange",
+        "Language",
         "Encoding",
         "Charset",
     };
 
-    const index = parser.findExtension(slice, &possibleValues, "-", 2) catch |err|
+    const index = parser.findExtension(slice, &possibleValues, "-", 2, true) catch |err|
         switch (err) {
             ParserErr.FieldsNotFound, ParserErr.UnknownFieldName => {
-                std.debug.print("{any} in acceptHandler\n", .{err});
+                std.debug.print("{any} while parsing accept\n", .{err});
                 return;
             },
             else => unreachable,
@@ -185,36 +189,95 @@ fn acceptHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
 
     const allocator = request.arena.allocator();
 
+    // NOTE: delete this print statements later
     switch (index) {
-        0 => request.client.Accept = try allocator.dupe(u8, accept),
-        1 => request.client.AcceptLanguage = try allocator.dupe(u8, accept),
-        2 => request.client.AcceptEncoding = try allocator.dupe(u8, accept),
-        3 => request.client.AcceptCharset = try allocator.dupe(u8, accept),
+        0 => {
+            request.client.Accept = try allocator.dupe(u8, accept);
+            std.debug.print("[DEBUG]Accept: {s}\n", .{request.client.Accept.?});
+        },
+        1 => {
+            request.client.AcceptLanguage = try allocator.dupe(u8, accept);
+            std.debug.print("[DEBUG]Accept-Language: {s}\n", .{request.client.AcceptLanguage.?});
+        },
+        2 => {
+            request.client.AcceptEncoding = try allocator.dupe(u8, accept);
+            std.debug.print("[DEBUG]Accept-Encoding: {s}\n", .{request.client.AcceptEncoding.?});
+        },
+        3 => {
+            request.client.AcceptCharset = try allocator.dupe(u8, accept);
+            std.debug.print("[DEBUG]Accept-Charset: {s}\n", .{request.client.AcceptCharset.?});
+        },
         else => unreachable,
     }
 }
-fn DNTHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
+/// unused for now
+fn DNTHandler(slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
     std.debug.print("DNT: {s}\n", .{slice});
 }
-fn authHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
+/// unused for now
+fn authHandler(slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
     std.debug.print("auth: {s}\n", .{slice});
 }
-fn cookieHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
+///
+fn cookieHandler(slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
     std.debug.print("cookie: {s}\n", .{slice});
 }
-fn contentHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
-    _ = request;
-    std.debug.print("content: {s}\n", .{slice});
+fn contentHandler(slice: []const u8, request: *HttpTemplate) !void {
+    const possibleContent = [_][]const u8{
+        "Type",
+        "Encoding",
+        "Length",
+        "Language",
+    };
+
+    const index = parser.findExtension(slice, &possibleContent, "-", 2, false) catch |err|
+        switch (err) {
+            ParserErr.FieldsNotFound, ParserErr.UnknownFieldName => {
+                std.debug.print("{any} while parsing content\n", .{err});
+                return;
+            },
+            else => unreachable,
+        };
+
+    const content = getContent(slice) catch |err| {
+        std.debug.print("{any}\n", .{err});
+        return;
+    } orelse {
+        std.debug.print("cannot find Accept fields\n", .{});
+        return;
+    };
+
+    const allocator = request.arena.allocator();
+
+    switch (index) {
+        0 => {
+            request.payload.ContentType = try allocator.dupe(u8, content);
+            std.debug.print("[DEBUG]Content-Type: {s}\n", .{request.payload.ContentType.?});
+        },
+        1 => {
+            request.payload.ContentEncoding = try allocator.dupe(u8, content);
+            std.debug.print("[DEBUG]Content-Encoding: {s}\n", .{request.payload.ContentEncoding.?});
+        },
+        2 => {
+            request.payload.ContentLength = try allocator.dupe(u8, content);
+            std.debug.print("[DEBUG]Content-Length: {s}\n", .{request.payload.ContentLength.?});
+        },
+        3 => {
+            request.payload.ContentLanguage = try allocator.dupe(u8, content);
+            std.debug.print("[DEBUG]Content-Language: {s}\n", .{request.payload.ContentLanguage.?});
+        },
+        else => unreachable,
+    }
 }
-fn secHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
+fn secHandler(slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
-    std.debug.print("sec: {s}\n", .{slice});
+    std.debug.print("[DEBUG]sec: {s}\n", .{slice});
 }
 
-fn determineHeader(noalias slice: []const u8, request: *HttpTemplate) void {
+fn determineHeader(slice: []const u8, request: *HttpTemplate) void {
     const jumpTable = [_]whatHeader{
         &hostHandler,
         &connectionHandler,
@@ -254,9 +317,21 @@ fn determineHeader(noalias slice: []const u8, request: *HttpTemplate) void {
     }
 }
 
+fn getBody(slice: []const u8, delimiter: []const u8, request: *HttpTemplate) !void {
+    var iter = std.mem.splitSequence(u8, slice, delimiter);
+
+    var tmp: []const u8 = undefined;
+    while (iter.peek() != null) {
+        tmp = iter.next().?;
+    }
+
+    const allocator = request.arena.allocator();
+    request.body = try allocator.dupe(u8, tmp);
+}
+
 /// return the index that matches your field extension
 /// you must declare the default field with no extension on index 0
-fn findExtension(slice: []const u8, possibleValues: []const []const u8, delimiter: []const u8, searchDepth: u8) !i8 {
+fn findExtension(slice: []const u8, comptime possibleValues: []const []const u8, delimiter: []const u8, searchDepth: u8, comptime zeroAsFallback: bool) !i8 {
     var iter = std.mem.splitSequence(u8, slice, ":");
     const mainField = iter.next() orelse return ParserErr.FieldsNotFound;
 
@@ -265,17 +340,23 @@ fn findExtension(slice: []const u8, possibleValues: []const []const u8, delimite
     var searchThrough = searchDepth;
 
     while (searchThrough > 0) : (searchThrough -= 1) {
-        extension = iterExt.next() orelse unreachable;
-        if (searchThrough == searchDepth)
-            if (!std.ascii.eqlIgnoreCase(extension, possibleValues[0])) return ParserErr.UnknownFieldName;
+        extension = iterExt.next() orelse return ParserErr.FieldsNotFound;
+
+        if (searchThrough == searchDepth) {
+            if (zeroAsFallback) {
+                if (!std.ascii.eqlIgnoreCase(extension, possibleValues[0])) return ParserErr.UnknownFieldName;
+                if (iterExt.peek() == null) return 0;
+            }
+        }
     }
 
-    std.debug.print("this si the extension: {s}\n", .{extension});
     for (possibleValues, 0..) |value, i| {
         if (std.ascii.eqlIgnoreCase(value, extension))
             return @as(i8, @intCast(i));
     }
-    return 0;
+    if (zeroAsFallback)
+        return 0;
+    return ParserErr.UnknownFieldName;
 }
 
 /// get fields and strip the content down from slice
