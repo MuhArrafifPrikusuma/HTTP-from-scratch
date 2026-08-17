@@ -80,16 +80,16 @@ const ParserErr = error{
 
 pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !void {
     const bytes: *lib.ReadContext = @ptrCast(@alignCast(bytesPtr));
-    defer bytes.destroy();
+    defer bytes.deinit();
 
     const request = try HttpTemplate.init(std.heap.smp_allocator);
 
     _ = io;
 
-    parser.splitPayload(&bytes.readBuffer, request);
+    parser.splitPayload(&bytes.readBuffer, request) catch |err| std.debug.print("{any}\n", .{err});
 }
 
-fn splitPayload(bytes: *const []u8, request: *HttpTemplate) void {
+fn splitPayload(bytes: *const []u8, request: *HttpTemplate) !void {
     var iter = std.mem.splitSequence(u8, bytes.*, "\r\n");
     const allocator = request.arena.allocator();
 
@@ -99,18 +99,18 @@ fn splitPayload(bytes: *const []u8, request: *HttpTemplate) void {
 
         const current = iter.next() orelse return;
         if (i == 0) {
-            request.routing.RequestLine = allocator.dupe(u8, current) catch unreachable;
+            request.routing.RequestLine = try allocator.dupe(u8, current);
             std.debug.print("this is request line: {s}\n", .{request.routing.RequestLine.?});
             continue;
         }
 
-        determineHeader(current, request) catch unreachable;
+        determineHeader(current, request);
     }
 }
 
-const whatHeader = *const fn (noalias slice: []const u8, request: *HttpTemplate) void;
+const whatHeader = *const fn (noalias slice: []const u8, request: *HttpTemplate) anyerror!void;
 
-fn hostHandler(noalias slice: []const u8, request: *HttpTemplate) void {
+fn hostHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     const host = parser.getContent(slice) catch |err| {
         std.debug.print("{any}\n", .{err});
         return;
@@ -120,11 +120,11 @@ fn hostHandler(noalias slice: []const u8, request: *HttpTemplate) void {
     };
 
     const allocator = request.arena.allocator();
-    request.routing.Host = allocator.dupe(u8, host) catch unreachable;
+    request.routing.Host = try allocator.dupe(u8, host);
 
     std.debug.print("extracted: {s}\n", .{request.routing.Host.?});
 }
-fn connectionHandler(noalias slice: []const u8, request: *HttpTemplate) void {
+fn connectionHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     const conType = parser.getContent(slice) catch |err| {
         std.debug.print("{any}\n", .{err});
         return;
@@ -133,16 +133,16 @@ fn connectionHandler(noalias slice: []const u8, request: *HttpTemplate) void {
         return;
     };
     const allocator = request.arena.allocator();
-    request.routing.Connection = allocator.dupe(u8, conType) catch unreachable;
+    request.routing.Connection = try allocator.dupe(u8, conType);
 
     std.debug.print("connection: {s}\n", .{request.routing.Connection.?});
 }
 /// NOTE: not needed for now, maybe later
-fn upgradeHandler(noalias slice: []const u8, request: *HttpTemplate) void {
+fn upgradeHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     std.debug.print("upgrade: {s}\n", .{slice});
     _ = request;
 }
-fn agentHandler(noalias slice: []const u8, request: *HttpTemplate) void {
+fn agentHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     const agent = parser.getContent(slice) catch |err| {
         std.debug.print("{any}\n", .{err});
         return;
@@ -153,12 +153,12 @@ fn agentHandler(noalias slice: []const u8, request: *HttpTemplate) void {
 
     const allocator = request.arena.allocator();
 
-    request.client.UserAgent = allocator.dupe(u8, agent) catch unreachable;
+    request.client.UserAgent = try allocator.dupe(u8, agent);
     std.debug.print("agent: {s}\n", .{request.client.UserAgent.?});
 }
 
 // NOTE: finish this later
-fn acceptHandler(noalias slice: []const u8, request: *HttpTemplate) void {
+fn acceptHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     const possibleValues = [_][]const u8{
         "Accept",
         "Languange",
@@ -186,35 +186,35 @@ fn acceptHandler(noalias slice: []const u8, request: *HttpTemplate) void {
     const allocator = request.arena.allocator();
 
     switch (index) {
-        0 => request.client.Accept = allocator.dupe(u8, accept) catch unreachable,
-        1 => request.client.AcceptLanguage = allocator.dupe(u8, accept) catch unreachable,
-        2 => request.client.AcceptEncoding = allocator.dupe(u8, accept) catch unreachable,
-        3 => request.client.AcceptCharset = allocator.dupe(u8, accept) catch unreachable,
+        0 => request.client.Accept = try allocator.dupe(u8, accept),
+        1 => request.client.AcceptLanguage = try allocator.dupe(u8, accept),
+        2 => request.client.AcceptEncoding = try allocator.dupe(u8, accept),
+        3 => request.client.AcceptCharset = try allocator.dupe(u8, accept),
         else => unreachable,
     }
 }
-fn DNTHandler(noalias slice: []const u8, request: *HttpTemplate) void {
+fn DNTHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
     std.debug.print("DNT: {s}\n", .{slice});
 }
-fn authHandler(noalias slice: []const u8, request: *HttpTemplate) void {
+fn authHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
     std.debug.print("auth: {s}\n", .{slice});
 }
-fn cookieHandler(noalias slice: []const u8, request: *HttpTemplate) void {
+fn cookieHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
     std.debug.print("cookie: {s}\n", .{slice});
 }
-fn contentHandler(noalias slice: []const u8, request: *HttpTemplate) void {
+fn contentHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
     std.debug.print("content: {s}\n", .{slice});
 }
-fn secHandler(noalias slice: []const u8, request: *HttpTemplate) void {
+fn secHandler(noalias slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
     std.debug.print("sec: {s}\n", .{slice});
 }
 
-fn determineHeader(noalias slice: []const u8, request: *HttpTemplate) error{UnknownFields}!void {
+fn determineHeader(noalias slice: []const u8, request: *HttpTemplate) void {
     const jumpTable = [_]whatHeader{
         &hostHandler,
         &connectionHandler,
@@ -248,7 +248,7 @@ fn determineHeader(noalias slice: []const u8, request: *HttpTemplate) error{Unkn
 
     for (jumpTable, knownHeader) |jump, header| {
         if (std.ascii.eqlIgnoreCase(header, field)) {
-            jump(slice, request);
+            jump(slice, request) catch |err| std.debug.print("determineHeader: {any}\n", .{err});
             break;
         }
     }
@@ -256,7 +256,7 @@ fn determineHeader(noalias slice: []const u8, request: *HttpTemplate) error{Unkn
 
 /// return the index that matches your field extension
 /// you must declare the default field with no extension on index 0
-fn findExtension(slice: []const u8, possibleValues: []const []const u8, delimiter: []const u8, searchDepth: u8) ParserErr!i8 {
+fn findExtension(slice: []const u8, possibleValues: []const []const u8, delimiter: []const u8, searchDepth: u8) !i8 {
     var iter = std.mem.splitSequence(u8, slice, ":");
     const mainField = iter.next() orelse return ParserErr.FieldsNotFound;
 

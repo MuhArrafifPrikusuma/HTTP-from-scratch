@@ -118,6 +118,9 @@ static void Io_Writer(ConnectionContext *restrict ctx, void *io) {
 static void Io_Reader(ConnectionContext *restrict ctx, void *io) {
   // NOTE: free ctx->reader_context after write/ disconnect/ crash
   ctx->reader_context = eReader(ctx->fd, ctx->ipstr, io);
+  if (ctx->reader_context == NULL)
+    fprintf(stderr, "reader went wrong\n");
+
   printf("take this pointer later to another functions that need to read this: "
          "\n");
 }

@@ -10,7 +10,7 @@ pub const ReadContext = struct {
     buffer: [4096]u8,
     readBuffer: []u8,
 
-    pub fn create(backing_allocator: std.mem.Allocator) !*ReadContext {
+    pub fn init(backing_allocator: std.mem.Allocator) !*ReadContext {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
         errdefer arena.deinit();
 
@@ -26,14 +26,15 @@ pub const ReadContext = struct {
         return self;
     }
 
-    pub fn destroy(self: *ReadContext) void {
+    pub fn deinit(self: *ReadContext) void {
         const arena = self.arena;
         arena.deinit();
     }
 };
 
-export fn eReader(fd: c_int, from_addr: Cstring, ioptr: *anyopaque) *anyopaque {
-    return Io.Reader(fd, from_addr, ioptr);
+export fn eReader(fd: c_int, from_addr: Cstring, ioptr: *anyopaque) ?*anyopaque {
+    const ptr = Io.Reader(fd, from_addr, ioptr) catch return null;
+    return ptr;
 }
 
 test {
