@@ -35,13 +35,31 @@ const HttpTemplate = struct {
     auth: Auth = undefined,
     payload: ContentPayload = undefined,
     arena: std.heap.ArenaAllocator,
+    child_allocator: std.mem.Allocator,
 
     pub fn parseRequestLine(self: *HttpTemplate) void {
         _ = self;
     }
 
-    pub fn destroy(self: *HttpTemplate) void {
+    /// allocate to arena pointer
+    pub fn init(child_allocator: std.mem.Allocator) !*HttpTemplate {
+        const ptr = try child_allocator.create(HttpTemplate);
+        ptr.* = .{
+            .child_allocator = child_allocator,
+            .arena = std.heap.ArenaAllocator.init(child_allocator),
+            .client = undefined,
+            .auth = undefined,
+            .payload = undefined,
+            .routing = undefined,
+        };
+        return ptr;
+    }
+
+    pub fn deinit(self: *HttpTemplate) void {
+        const allocator = self.child_allocator;
         self.arena.deinit();
+
+        allocator.destroy(self);
     }
     // // take all of those and if undefined then deprecated else if it's filled we take those
     // fn buildString(self: *HttpTemplate) []u8 {}
@@ -59,17 +77,15 @@ const ParserErr = error{
     UnknownFieldName,
 };
 
-pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) ParserErr!void {
+pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !void {
     const bytes: *lib.ReadContext = @ptrCast(@alignCast(bytesPtr));
     defer bytes.destroy();
 
-    var request = HttpTemplate{
-        .arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator),
-    };
+    const request = try HttpTemplate.init(std.heap.smp_allocator);
 
     _ = io;
 
-    parser.splitPayload(&bytes.readBuffer, &request);
+    parser.splitPayload(&bytes.readBuffer, request);
 }
 
 fn splitPayload(bytes: *const []u8, request: *HttpTemplate) void {
@@ -90,19 +106,6 @@ fn splitPayload(bytes: *const []u8, request: *HttpTemplate) void {
         determineHeader(current, request) catch unreachable;
     }
 }
-
-const knownHeader = [_][]const u8{
-    "Host",
-    "Connection",
-    "Upgrade",
-    "User",
-    "Accept",
-    "DNT",
-    "Authorization",
-    "Cookie",
-    "Content",
-    "Sec",
-};
 
 const whatHeader = *const fn (noalias slice: []const u8, request: *HttpTemplate) void;
 
@@ -146,12 +149,14 @@ fn agentHandler(noalias slice: []const u8, request: *HttpTemplate) void {
         std.debug.print("cannot find user agent", .{});
         return;
     };
+
     const allocator = request.arena.allocator();
 
     request.client.UserAgent = allocator.dupe(u8, agent) catch unreachable;
     std.debug.print("agent: {s}\n", .{request.client.UserAgent.?});
 }
 
+// NOTE: finish this later
 fn acceptHandler(noalias slice: []const u8, request: *HttpTemplate) void {
     const possibleValues = [_][]const u8{
         "Accept",
@@ -222,6 +227,19 @@ fn determineHeader(noalias slice: []const u8, request: *HttpTemplate) error{Unkn
         &secHandler,
     };
 
+    const knownHeader = [_][]const u8{
+        "Host",
+        "Connection",
+        "Upgrade",
+        "User",
+        "Accept",
+        "DNT",
+        "Authorization",
+        "Cookie",
+        "Content",
+        "Sec",
+    };
+
     const field = parser.getFields(slice) catch |err| {
         std.debug.print("{any}\n", .{err});
         return;
@@ -244,6 +262,7 @@ fn findExtension(slice: []const u8, possibleValues: []const []const u8, delimite
     var iterExt = std.mem.splitSequence(u8, mainField, delimiter);
     var extension: []const u8 = undefined;
     var searchThrough = searchDepth;
+
     while (searchThrough > 0) : (searchThrough -= 1) {
         extension = iterExt.next() orelse unreachable;
         if (searchThrough == searchDepth)
@@ -258,7 +277,7 @@ fn findExtension(slice: []const u8, possibleValues: []const []const u8, delimite
     return 0;
 }
 
-/// get fields from the slice
+/// get fields and strip the content down from slice
 fn getFields(slice: []const u8) ParserErr![]const u8 {
     var iter = std.mem.splitSequence(u8, slice, ":");
     if (iter.peek() != null) iter = std.mem.splitSequence(u8, iter.peek().?, "-");
@@ -268,6 +287,7 @@ fn getFields(slice: []const u8) ParserErr![]const u8 {
     return val;
 }
 
+/// strip the field and take the content
 fn getContent(slice: []const u8) ParserErr!?[]const u8 {
     var iterField = std.mem.splitSequence(u8, slice, ": ");
     if (iterField.next() == null) return null;
