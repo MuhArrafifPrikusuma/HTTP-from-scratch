@@ -35,6 +35,7 @@ pub const HttpTemplate = struct {
     auth: Auth = .{},
     payload: ContentPayload = .{},
     body: ?[]const u8 = null,
+    date: ?[]const u8 = null, // <- NOTE: Must be RFC1123 format!
     arena: std.heap.ArenaAllocator,
 
     pub fn parseRequestLine(self: *HttpTemplate) void {
@@ -74,7 +75,26 @@ const ParserErr = error{
     FieldsNotFound,
     FailedToExtractContent,
     UnknownFieldName,
+    UnknownMethod,
+    CannotFindMethod,
+    IncompleteLine,
 };
+
+const Methods = enum {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+};
+
+pub const Line = struct {
+    method: ?Methods = null,
+    ver: ?[]const u8 = null,
+    path: ?[]const u8 = null,
+    status: ?[]const u8 = null,
+};
+
+const whatHeader = *const fn (slice: []const u8, request: *HttpTemplate) anyerror!void;
 
 pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !*HttpTemplate {
     const bytes: *lib.ReadContext = @ptrCast(@alignCast(bytesPtr));
@@ -85,6 +105,11 @@ pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !*HttpTemplate {
     _ = io;
 
     parser.splitPayload(bytes.readBuffer, request) catch |err| std.debug.print("{any}\n", .{err});
+    var lineBuf: Line = .{};
+    try parser.parseRLine(&lineBuf, request.routing.RequestLine);
+    std.debug.print("[DEBUG]line method: {any}\n", .{lineBuf.method.?});
+    std.debug.print("[DEBUG]ver: {s}\n", .{lineBuf.ver.?});
+    std.debug.print("[DEBUG]path: {s}\n", .{lineBuf.path.?});
 
     return request;
 }
@@ -109,8 +134,6 @@ fn splitPayload(bytes: []const u8, request: *HttpTemplate) !void {
     }
     std.debug.print("[DEBUG]body: {s}\n[DEBUG]body length: {d}\n", .{ request.body.?, request.body.?.len });
 }
-
-const whatHeader = *const fn (slice: []const u8, request: *HttpTemplate) anyerror!void;
 
 fn hostHandler(slice: []const u8, request: *HttpTemplate) !void {
     const host = parser.getContent(slice) catch |err| {
@@ -159,7 +182,6 @@ fn agentHandler(slice: []const u8, request: *HttpTemplate) !void {
     std.debug.print("[DEBUG]agent: {s}\n", .{request.client.UserAgent.?});
 }
 
-// NOTE: finish this later
 fn acceptHandler(slice: []const u8, request: *HttpTemplate) !void {
     const possibleValues = [_][]const u8{
         "Accept",
@@ -168,7 +190,7 @@ fn acceptHandler(slice: []const u8, request: *HttpTemplate) !void {
         "Charset",
     };
 
-    const index = parser.findExtension(slice, &possibleValues, "-", 2, true) catch |err|
+    const index = parser.findExtension(slice, &possibleValues, ":-", 2, true) catch |err|
         switch (err) {
             ParserErr.FieldsNotFound, ParserErr.UnknownFieldName => {
                 std.debug.print("{any} while parsing accept\n", .{err});
@@ -231,7 +253,7 @@ fn contentHandler(slice: []const u8, request: *HttpTemplate) !void {
         "Language",
     };
 
-    const index = parser.findExtension(slice, &possibleContent, "-", 2, false) catch |err|
+    const index = parser.findExtension(slice, &possibleContent, ":-", 2, false) catch |err|
         switch (err) {
             ParserErr.FieldsNotFound, ParserErr.UnknownFieldName => {
                 std.debug.print("{any} while parsing content\n", .{err});
@@ -278,16 +300,16 @@ fn secHandler(slice: []const u8, request: *HttpTemplate) !void {
 
 fn determineHeader(slice: []const u8, request: *HttpTemplate) void {
     const jumpTable = [_]whatHeader{
-        &hostHandler,
-        &connectionHandler,
-        &upgradeHandler,
-        &agentHandler,
-        &acceptHandler,
-        &DNTHandler,
-        &authHandler,
-        &cookieHandler,
-        &contentHandler,
-        &secHandler,
+        hostHandler,
+        connectionHandler,
+        upgradeHandler,
+        agentHandler,
+        acceptHandler,
+        DNTHandler,
+        authHandler,
+        cookieHandler,
+        contentHandler,
+        secHandler,
     };
 
     const knownHeader = [_][]const u8{
@@ -331,20 +353,18 @@ fn getBody(slice: []const u8, delimiter: []const u8, request: *HttpTemplate) !vo
 /// return the index that matches your field extension
 /// you must declare the default field with no extension on index 0
 fn findExtension(slice: []const u8, comptime possibleValues: []const []const u8, comptime delimiter: []const u8, searchDepth: u8, comptime zeroAsFallback: bool) !i8 {
-    var iter = std.mem.splitSequence(u8, slice, ":");
-    const mainField = iter.next() orelse return ParserErr.FieldsNotFound;
+    var iter = std.mem.splitAny(u8, slice, delimiter);
 
-    var iterExt = std.mem.splitSequence(u8, mainField, delimiter);
     var extension: []const u8 = undefined;
     var searchThrough = searchDepth;
 
     while (searchThrough > 0) : (searchThrough -= 1) {
-        extension = iterExt.next() orelse return ParserErr.FieldsNotFound;
+        extension = iter.next() orelse return ParserErr.FieldsNotFound;
 
         if (searchThrough == searchDepth) {
             if (zeroAsFallback) {
                 if (!std.ascii.eqlIgnoreCase(extension, possibleValues[0])) return ParserErr.UnknownFieldName;
-                if (iterExt.peek() == null) return 0;
+                if (iter.peek() == null) return 0;
             }
         }
     }
@@ -374,10 +394,46 @@ fn getContent(slice: []const u8) ParserErr!?[]const u8 {
     if (iterField.next() == null) return null;
 
     var iterContent = std.mem.splitSequence(u8, iterField.next().?, "\r\n");
-    if (iterContent.peek().?.len == 0) return null;
     if (iterContent.peek() == null) return ParserErr.FailedToExtractContent;
+    if (iterContent.peek().?.len == 0) return null;
 
     const content = iterContent.next() orelse null;
 
     return content;
+}
+
+// NOTE: make 1 function to parse both request line and response line and return struct
+// specifically tailored to them
+
+pub fn parseRLine(lineBuffer: *Line, line: ?[]const u8) !void {
+    const linestr = line orelse return;
+    var iter = std.mem.splitScalar(u8, linestr, ' ');
+
+    const whatMethod = iter.next() orelse return ParserErr.CannotFindMethod;
+    const method = try getMethods(whatMethod);
+    lineBuffer.*.method = method;
+
+    // get path if exist
+    var curr: []const u8 = undefined;
+    while (true) {
+        curr = iter.next() orelse break;
+        if (curr[0] == 'H' or curr[0] == 'h') lineBuffer.*.ver = curr;
+        if (curr[0] == '/') lineBuffer.*.path = curr;
+    }
+
+    if (lineBuffer.*.ver == null) return ParserErr.IncompleteLine;
+    if (lineBuffer.*.method == null) return ParserErr.IncompleteLine;
+    if (lineBuffer.*.path == null) return ParserErr.IncompleteLine;
+}
+
+fn getMethods(key: []const u8) !Methods {
+    const staticMap = std.StaticStringMap(Methods).initComptime(.{
+        .{ "GET", .GET },
+        .{ "POST", .POST },
+        .{ "PUT", .PUT },
+        .{ "DELETE", .DELETE },
+    });
+
+    const meth = staticMap.get(key) orelse return ParserErr.UnknownMethod;
+    return meth;
 }
