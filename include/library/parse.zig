@@ -35,6 +35,7 @@ pub const HttpTemplate = struct {
     auth: Auth = .{},
     payload: ContentPayload = .{},
     body: ?[]const u8 = null,
+    date: ?[]const u8 = null, // <- NOTE: Must be RFC1123 format!
     arena: std.heap.ArenaAllocator,
 
     pub fn parseRequestLine(self: *HttpTemplate) void {
@@ -74,6 +75,7 @@ const ParserErr = error{
     FieldsNotFound,
     FailedToExtractContent,
     UnknownFieldName,
+    UnknownMethod,
 };
 
 pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !*HttpTemplate {
@@ -85,6 +87,9 @@ pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !*HttpTemplate {
     _ = io;
 
     parser.splitPayload(bytes.readBuffer, request) catch |err| std.debug.print("{any}\n", .{err});
+    var lineBuf: Line = undefined;
+    try parser.parseRLine(&lineBuf, request.routing.RequestLine);
+    std.debug.print("[DEBUG]line method: {any}\n", .{lineBuf.method});
 
     return request;
 }
@@ -168,7 +173,7 @@ fn acceptHandler(slice: []const u8, request: *HttpTemplate) !void {
         "Charset",
     };
 
-    const index = parser.findExtension(slice, &possibleValues, "-", 2, true) catch |err|
+    const index = parser.findExtension(slice, &possibleValues, ":-", 2, true) catch |err|
         switch (err) {
             ParserErr.FieldsNotFound, ParserErr.UnknownFieldName => {
                 std.debug.print("{any} while parsing accept\n", .{err});
@@ -231,7 +236,7 @@ fn contentHandler(slice: []const u8, request: *HttpTemplate) !void {
         "Language",
     };
 
-    const index = parser.findExtension(slice, &possibleContent, "-", 2, false) catch |err|
+    const index = parser.findExtension(slice, &possibleContent, ":-", 2, false) catch |err|
         switch (err) {
             ParserErr.FieldsNotFound, ParserErr.UnknownFieldName => {
                 std.debug.print("{any} while parsing content\n", .{err});
@@ -278,16 +283,16 @@ fn secHandler(slice: []const u8, request: *HttpTemplate) !void {
 
 fn determineHeader(slice: []const u8, request: *HttpTemplate) void {
     const jumpTable = [_]whatHeader{
-        &hostHandler,
-        &connectionHandler,
-        &upgradeHandler,
-        &agentHandler,
-        &acceptHandler,
-        &DNTHandler,
-        &authHandler,
-        &cookieHandler,
-        &contentHandler,
-        &secHandler,
+        hostHandler,
+        connectionHandler,
+        upgradeHandler,
+        agentHandler,
+        acceptHandler,
+        DNTHandler,
+        authHandler,
+        cookieHandler,
+        contentHandler,
+        secHandler,
     };
 
     const knownHeader = [_][]const u8{
@@ -331,20 +336,18 @@ fn getBody(slice: []const u8, delimiter: []const u8, request: *HttpTemplate) !vo
 /// return the index that matches your field extension
 /// you must declare the default field with no extension on index 0
 fn findExtension(slice: []const u8, comptime possibleValues: []const []const u8, comptime delimiter: []const u8, searchDepth: u8, comptime zeroAsFallback: bool) !i8 {
-    var iter = std.mem.splitSequence(u8, slice, ":");
-    const mainField = iter.next() orelse return ParserErr.FieldsNotFound;
+    var iter = std.mem.splitAny(u8, slice, delimiter);
 
-    var iterExt = std.mem.splitSequence(u8, mainField, delimiter);
     var extension: []const u8 = undefined;
     var searchThrough = searchDepth;
 
     while (searchThrough > 0) : (searchThrough -= 1) {
-        extension = iterExt.next() orelse return ParserErr.FieldsNotFound;
+        extension = iter.next() orelse return ParserErr.FieldsNotFound;
 
         if (searchThrough == searchDepth) {
             if (zeroAsFallback) {
                 if (!std.ascii.eqlIgnoreCase(extension, possibleValues[0])) return ParserErr.UnknownFieldName;
-                if (iterExt.peek() == null) return 0;
+                if (iter.peek() == null) return 0;
             }
         }
     }
@@ -374,10 +377,48 @@ fn getContent(slice: []const u8) ParserErr!?[]const u8 {
     if (iterField.next() == null) return null;
 
     var iterContent = std.mem.splitSequence(u8, iterField.next().?, "\r\n");
-    if (iterContent.peek().?.len == 0) return null;
     if (iterContent.peek() == null) return ParserErr.FailedToExtractContent;
+    if (iterContent.peek().?.len == 0) return null;
 
     const content = iterContent.next() orelse null;
 
     return content;
+}
+
+// NOTE: make 1 function to parse both request line and response line and return struct
+// specifically tailored to them
+
+const Methods = enum {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+};
+
+pub const Line = struct {
+    method: Methods,
+    ver: []const u8,
+    path: ?[]const u8,
+    status: ?[]const u8,
+};
+pub fn parseRLine(lineBuffer: *Line, line: ?[]const u8) !void {
+    const linestr = line orelse return;
+    var iter = std.mem.splitScalar(u8, linestr, ' ');
+
+    std.debug.print("[DEBUG]test: {s}\n", .{iter.peek().?});
+    const method = try getMethods(iter.peek().?);
+
+    lineBuffer.*.method = method;
+}
+
+fn getMethods(key: []const u8) !Methods {
+    const staticMap = std.StaticStringMap(Methods).initComptime(.{
+        .{ "GET", .GET },
+        .{ "POST", .POST },
+        .{ "PUT", .PUT },
+        .{ "DELETE", .DELETE },
+    });
+
+    const meth = staticMap.get(key) orelse return ParserErr.UnknownMethod;
+    return meth;
 }
