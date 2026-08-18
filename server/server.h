@@ -16,7 +16,7 @@ typedef struct ConnectionContext ConnectionContext;
 // write global action arrays based on what flag returned
 typedef int (*ConnectionAction)(ConnectionContext *);
 struct ConnectionContext {
-  void *reader_context;
+  void *request;
   char *write_buffer;
   char read_buffer[MAX_READ];
   size_t write_bytes;

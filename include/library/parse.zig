@@ -29,7 +29,7 @@ const ContentPayload = struct {
     ContentLanguage: ?[]const u8 = null,
 };
 // after we parsed it store it here
-const HttpTemplate = struct {
+pub const HttpTemplate = struct {
     routing: GeneralRouting = .{},
     client: ClientAgent = .{},
     auth: Auth = .{},
@@ -71,16 +71,12 @@ const HttpTemplate = struct {
 };
 
 const ParserErr = error{
-    unknownRequest,
-    no_request,
-    unknown_len,
-    invalid_request,
     FieldsNotFound,
     FailedToExtractContent,
     UnknownFieldName,
 };
 
-pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !void {
+pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !*HttpTemplate {
     const bytes: *lib.ReadContext = @ptrCast(@alignCast(bytesPtr));
     defer bytes.deinit();
 
@@ -89,6 +85,8 @@ pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !void {
     _ = io;
 
     parser.splitPayload(bytes.readBuffer, request) catch |err| std.debug.print("{any}\n", .{err});
+
+    return request;
 }
 
 fn splitPayload(bytes: []const u8, request: *HttpTemplate) !void {
@@ -220,7 +218,7 @@ fn authHandler(slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
     std.debug.print("auth: {s}\n", .{slice});
 }
-///
+// unused for now
 fn cookieHandler(slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
     std.debug.print("cookie: {s}\n", .{slice});
@@ -272,6 +270,7 @@ fn contentHandler(slice: []const u8, request: *HttpTemplate) !void {
         else => unreachable,
     }
 }
+/// unused for now
 fn secHandler(slice: []const u8, request: *HttpTemplate) !void {
     _ = request;
     std.debug.print("[DEBUG]sec: {s}\n", .{slice});
@@ -331,7 +330,7 @@ fn getBody(slice: []const u8, delimiter: []const u8, request: *HttpTemplate) !vo
 
 /// return the index that matches your field extension
 /// you must declare the default field with no extension on index 0
-fn findExtension(slice: []const u8, comptime possibleValues: []const []const u8, delimiter: []const u8, searchDepth: u8, comptime zeroAsFallback: bool) !i8 {
+fn findExtension(slice: []const u8, comptime possibleValues: []const []const u8, comptime delimiter: []const u8, searchDepth: u8, comptime zeroAsFallback: bool) !i8 {
     var iter = std.mem.splitSequence(u8, slice, ":");
     const mainField = iter.next() orelse return ParserErr.FieldsNotFound;
 
