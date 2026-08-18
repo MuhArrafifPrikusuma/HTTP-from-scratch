@@ -76,7 +76,25 @@ const ParserErr = error{
     FailedToExtractContent,
     UnknownFieldName,
     UnknownMethod,
+    CannotFindMethod,
+    IncompleteLine,
 };
+
+const Methods = enum {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+};
+
+pub const Line = struct {
+    method: ?Methods = null,
+    ver: ?[]const u8 = null,
+    path: ?[]const u8 = null,
+    status: ?[]const u8 = null,
+};
+
+const whatHeader = *const fn (slice: []const u8, request: *HttpTemplate) anyerror!void;
 
 pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !*HttpTemplate {
     const bytes: *lib.ReadContext = @ptrCast(@alignCast(bytesPtr));
@@ -87,9 +105,11 @@ pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !*HttpTemplate {
     _ = io;
 
     parser.splitPayload(bytes.readBuffer, request) catch |err| std.debug.print("{any}\n", .{err});
-    var lineBuf: Line = undefined;
+    var lineBuf: Line = .{};
     try parser.parseRLine(&lineBuf, request.routing.RequestLine);
-    std.debug.print("[DEBUG]line method: {any}\n", .{lineBuf.method});
+    std.debug.print("[DEBUG]line method: {any}\n", .{lineBuf.method.?});
+    std.debug.print("[DEBUG]ver: {s}\n", .{lineBuf.ver.?});
+    std.debug.print("[DEBUG]path: {s}\n", .{lineBuf.path.?});
 
     return request;
 }
@@ -114,8 +134,6 @@ fn splitPayload(bytes: []const u8, request: *HttpTemplate) !void {
     }
     std.debug.print("[DEBUG]body: {s}\n[DEBUG]body length: {d}\n", .{ request.body.?, request.body.?.len });
 }
-
-const whatHeader = *const fn (slice: []const u8, request: *HttpTemplate) anyerror!void;
 
 fn hostHandler(slice: []const u8, request: *HttpTemplate) !void {
     const host = parser.getContent(slice) catch |err| {
@@ -164,7 +182,6 @@ fn agentHandler(slice: []const u8, request: *HttpTemplate) !void {
     std.debug.print("[DEBUG]agent: {s}\n", .{request.client.UserAgent.?});
 }
 
-// NOTE: finish this later
 fn acceptHandler(slice: []const u8, request: *HttpTemplate) !void {
     const possibleValues = [_][]const u8{
         "Accept",
@@ -388,27 +405,25 @@ fn getContent(slice: []const u8) ParserErr!?[]const u8 {
 // NOTE: make 1 function to parse both request line and response line and return struct
 // specifically tailored to them
 
-const Methods = enum {
-    GET,
-    POST,
-    PUT,
-    DELETE,
-};
-
-pub const Line = struct {
-    method: Methods,
-    ver: []const u8,
-    path: ?[]const u8,
-    status: ?[]const u8,
-};
 pub fn parseRLine(lineBuffer: *Line, line: ?[]const u8) !void {
     const linestr = line orelse return;
     var iter = std.mem.splitScalar(u8, linestr, ' ');
 
-    std.debug.print("[DEBUG]test: {s}\n", .{iter.peek().?});
-    const method = try getMethods(iter.peek().?);
-
+    const whatMethod = iter.next() orelse return ParserErr.CannotFindMethod;
+    const method = try getMethods(whatMethod);
     lineBuffer.*.method = method;
+
+    // get path if exist
+    var curr: []const u8 = undefined;
+    while (true) {
+        curr = iter.next() orelse break;
+        if (curr[0] == 'H' or curr[0] == 'h') lineBuffer.*.ver = curr;
+        if (curr[0] == '/') lineBuffer.*.path = curr;
+    }
+
+    if (lineBuffer.*.ver == null) return ParserErr.IncompleteLine;
+    if (lineBuffer.*.method == null) return ParserErr.IncompleteLine;
+    if (lineBuffer.*.path == null) return ParserErr.IncompleteLine;
 }
 
 fn getMethods(key: []const u8) !Methods {
