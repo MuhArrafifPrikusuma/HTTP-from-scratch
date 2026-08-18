@@ -117,8 +117,9 @@ static void Io_Writer(ConnectionContext *restrict ctx, void *io) {
 }
 static void Io_Reader(ConnectionContext *restrict ctx, void *io) {
   // NOTE: free ctx->reader_context after write/ disconnect/ crash
-  ctx->reader_context = eReader(ctx->fd, ctx->ipstr, io);
-  if (ctx->reader_context == NULL)
+  ctx->request = eReader(ctx->fd, ctx->ipstr, io);
+
+  if (ctx->request == NULL)
     fprintf(stderr, "reader went wrong\n");
 
   printf("[NOTE]take this pointer later to another functions that need to read "
@@ -216,7 +217,7 @@ int epoll_handler(const int listener_fd, void *io) {
           EventFlags_t ef = stripFlags(&evfs);
 
           if (ef == HANG_UP) {
-            printf("%s%s : fd: %d: hang up %s\n", COLOR_RED, ctx->ipstr,
+            printf("%s%s : fd: %d: Disconnect %s\n", COLOR_RED, ctx->ipstr,
                    ctx->fd, COLOR_RESET);
             close(ctx->fd);
             free(ctx);
