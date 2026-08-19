@@ -3,13 +3,13 @@ const lib = @import("common.zig");
 const parser = @This();
 
 // method path and version
-const GeneralRouting = struct {
+pub const GeneralRouting = struct {
     RequestLine: ?[]const u8 = null,
     Host: ?[]const u8 = null,
     Connection: ?[]const u8 = null,
     Upgrade: ?[]const u8 = null,
 };
-const ClientAgent = struct {
+pub const ClientAgent = struct {
     UserAgent: ?[]const u8 = null,
     Accept: ?[]const u8 = null,
     AcceptLanguage: ?[]const u8 = null,
@@ -17,12 +17,12 @@ const ClientAgent = struct {
     AcceptCharset: ?[]const u8 = null,
     DNT: ?[]const u8 = null, // <- do not track
 };
-const Auth = struct {
+pub const Auth = struct {
     Authorization: ?[]const u8 = null,
     Cookie: ?[]const u8 = null,
     ProxyAuthorization: ?[]const u8 = null,
 };
-const ContentPayload = struct {
+pub const ContentPayload = struct {
     ContentType: ?[]const u8 = null,
     ContentLength: ?[]const u8 = null,
     ContentEncoding: ?[]const u8 = null,
@@ -80,7 +80,7 @@ const ParserErr = error{
     IncompleteLine,
 };
 
-const Methods = enum {
+pub const Methods = enum {
     GET,
     POST,
     PUT,
@@ -411,19 +411,19 @@ pub fn parseRLine(lineBuffer: *Line, line: ?[]const u8) !void {
 
     const whatMethod = iter.next() orelse return ParserErr.CannotFindMethod;
     const method = try getMethods(whatMethod);
-    lineBuffer.*.method = method;
+    lineBuffer.method = method;
 
     // get path if exist
     var curr: []const u8 = undefined;
     while (true) {
         curr = iter.next() orelse break;
-        if (curr[0] == 'H' or curr[0] == 'h') lineBuffer.*.ver = curr;
-        if (curr[0] == '/') lineBuffer.*.path = curr;
+        if (curr[0] == 'H' or curr[0] == 'h') lineBuffer.ver = curr;
+        if (curr[0] == '/') lineBuffer.path = curr;
     }
 
-    if (lineBuffer.*.ver == null) return ParserErr.IncompleteLine;
-    if (lineBuffer.*.method == null) return ParserErr.IncompleteLine;
-    if (lineBuffer.*.path == null) return ParserErr.IncompleteLine;
+    if (lineBuffer.ver == null) return ParserErr.IncompleteLine;
+    if (lineBuffer.method == null) return ParserErr.IncompleteLine;
+    if (lineBuffer.path == null) return ParserErr.IncompleteLine;
 }
 
 fn getMethods(key: []const u8) !Methods {

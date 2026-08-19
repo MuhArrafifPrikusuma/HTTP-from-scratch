@@ -1,9 +1,25 @@
 const std = @import("std");
 const lib = @import("common.zig");
+const net = @import("net.zig");
 
 const c = @cImport({
     @cInclude("../include/common.h");
 });
+
+const ServerErr = error{
+    RequestLineIsRequired,
+    UnknownRequest,
+};
+// comptime variable to determine path and method for user API
+const Routing = struct {
+    path: [20]?[]const u8 = @splat(null),
+    func: [20]?*const fn (w: *net.ResponseWriter) void = @splat(null),
+};
+
+pub var methGET: Routing = .{};
+pub var methPOST: Routing = .{};
+pub var methPUT: Routing = .{};
+pub var methDELETE: Routing = .{};
 
 pub fn Reader(fd: c_int, from_addr: lib.Cstring, ioptr: *anyopaque) !*anyopaque {
     const io: *std.Io = @ptrCast(@alignCast(ioptr));
@@ -35,36 +51,15 @@ pub fn Reader(fd: c_int, from_addr: lib.Cstring, ioptr: *anyopaque) !*anyopaque 
 //     const request: *lib.Parse.HttpTemplate = @ptrCast(@alignCast(requestPtrFromC));
 //     defer request.deinit();
 // }
+// fn handleGET(req_line: *lib.Parse.Line, request: *lib.Parse.HttpTemplate) !void {}
+
+// fn determineRequest(request: *lib.Parse.HttpTemplate) !void {
+//     const req_line_unparsed = request.routing.RequestLine orelse return ServerErr.RequestLineIsRequired;
+//     var requestLine_buffer: lib.Parse.Line = .{};
+//     lib.Parse.parseRLine(&requestLine_buffer, req_line_unparsed);
 //
-// fn glanceRequest(request: *lib.Parse.HttpTemplate) []bool {
-//     const fields = []const ?[]const u8{
-//         // routing 0-3
-//         request.routing.RequestLine,
-//         request.routing.Host,
-//         request.routing.Connection,
-//         request.routing.Upgrade,
-//         // client 4-9
-//         request.client.Accept,
-//         request.client.AcceptCharset,
-//         request.client.AcceptEncoding,
-//         request.client.AcceptLanguage,
-//         request.client.UserAgent,
-//         request.client.DNT,
-//         // content 10-13
-//         request.payload.ContentType,
-//         request.payload.ContentEncoding,
-//         request.payload.ContentLanguage,
-//         request.payload.ContentLength,
-//         // body 14
-//         request.body,
-//     };
-//     var whichExist: [15]bool = @splat(false);
-//
-//     for (fields, &whichExist) |v, w| {
-//         if (v == null or v.?.len == 0) continue;
-//         w = true;
-//         std.debug.print("test: {any}\n", .{w});
+//     switch (requestLine_buffer.method) {
+//         lib.Parse.Methods.GET => handleGET(&requestLine_buffer, request),
+//         else => return ServerErr.UnknownRequest,
 //     }
-//
-//     return whichExist;
 // }

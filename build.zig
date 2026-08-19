@@ -17,18 +17,18 @@ pub fn build(b: *std.Build) void {
     else
         &.{ "-std=c23", "-Wall", "-Wextra", "-Wpedantic", "-Werror" };
 
-    const zlib = b.addLibrary(.{
+    const net = b.addLibrary(.{
         .linkage = .static,
-        .name = "zlib",
+        .name = "net",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("include/library/common.zig"),
+            .root_source_file = b.path("include/library/net.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
         }),
     });
 
-    zlib.root_module.addIncludePath(b.path("include/"));
+    net.root_module.addIncludePath(b.path("include/"));
 
     const server_exe = b.addExecutable(.{
         .name = "server",
@@ -72,7 +72,7 @@ pub fn build(b: *std.Build) void {
     server_exe.root_module.addIncludePath(b.path("include/"));
     server_exe.root_module.addIncludePath(b.path("server/"));
     server_exe.root_module.addIncludePath(b.path("includel/library"));
-    server_exe.root_module.addImport("zlib", zlib.root_module);
+    server_exe.root_module.addImport("net", net.root_module);
 
     b.installArtifact(server_exe);
 
@@ -93,7 +93,7 @@ pub fn build(b: *std.Build) void {
     exe_tests.root_module.addIncludePath(b.path("include"));
     exe_tests.root_module.addIncludePath(b.path("server"));
     exe_tests.root_module.addIncludePath(b.path("include/library/"));
-    exe_tests.root_module.addImport("zlib", zlib.root_module);
+    exe_tests.root_module.addImport("net", net.root_module);
 
     exe_tests.root_module.addCSourceFiles(.{
         .files = &.{
@@ -102,7 +102,7 @@ pub fn build(b: *std.Build) void {
         },
         .flags = &.{ "-std=c23", "-DTESTING" },
     });
-    exe_tests.root_module.linkLibrary(zlib);
+    exe_tests.root_module.linkLibrary(net);
 
     const run_exe_tests = b.addRunArtifact(exe_tests);
     const test_step = b.step("test", "Run Unit tests");
@@ -131,7 +131,7 @@ pub fn build(b: *std.Build) void {
     zls_check.root_module.addIncludePath(b.path("server"));
     zls_check.root_module.addIncludePath(b.path("include"));
     zls_check.root_module.addIncludePath(b.path("include/library/"));
-    zls_check.root_module.addImport("zlib", zlib.root_module);
+    zls_check.root_module.addImport("net", net.root_module);
 
     const check_step = b.step("check", "Make zls check this artifact");
     check_step.dependOn(&zls_check.step);
