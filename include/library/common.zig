@@ -82,7 +82,7 @@ pub const ResponseWriter = struct {
 pub fn handleFunc(
     method: Parse.Methods,
     path: []const u8,
-    func: *const fn (w: *ResponseWriter) void,
+    func: *const fn (w: *ResponseWriter, r: *Parse.HttpTemplate) void,
 ) void {
     switch (method) {
         .GET => {

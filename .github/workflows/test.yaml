@@ -21,10 +21,10 @@ jobs:
         run: zig build test --summary all
 
       - name: build ReleaseFast bin test
-        run: zig build -Doptimize=ReleaseFast -DENABLE_NATIVE_ARCH=true
+        run: zig build -Doptimize=ReleaseFast -DENABLE_NATIVE_ARCH=true -Dtarget=x86_64-linux-gnu --summary all
 
       - name: build ReleaseSmall bin test
-        run: zig build -Doptimize=ReleaseSmall -DENABLE_NATIVE_ARCH=true
+        run: zig build -Doptimize=ReleaseSmall -DENABLE_NATIVE_ARCH=true -Dtarget=x86_64-linux-gnu --summary all
 
       - name: check
-        run: zig build check
+        run: zig build check --summary all
