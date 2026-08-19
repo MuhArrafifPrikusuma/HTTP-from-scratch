@@ -21,13 +21,12 @@ pub fn build(b: *std.Build) void {
         .linkage = .static,
         .name = "net",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("include/library/net.zig"),
+            .root_source_file = b.path("include/library/common.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
         }),
     });
-
     net.root_module.addIncludePath(b.path("include/"));
 
     const server_exe = b.addExecutable(.{
@@ -90,9 +89,9 @@ pub fn build(b: *std.Build) void {
     exe_tests.use_llvm = true;
     exe_tests.use_lld = true;
 
-    exe_tests.root_module.addIncludePath(b.path("include"));
-    exe_tests.root_module.addIncludePath(b.path("server"));
+    exe_tests.root_module.addIncludePath(b.path("include/"));
     exe_tests.root_module.addIncludePath(b.path("include/library/"));
+    exe_tests.root_module.addIncludePath(b.path("server/"));
     exe_tests.root_module.addImport("net", net.root_module);
 
     exe_tests.root_module.addCSourceFiles(.{
@@ -100,7 +99,7 @@ pub fn build(b: *std.Build) void {
             "include/common.c",
             "server/server.c",
         },
-        .flags = &.{ "-std=c23", "-DTESTING" },
+        .flags = &.{ "-std=c23", "-DTESTING", "-march=native", "-Wall", "-Wextra", "-Wpedantic", "-Werror" },
     });
     exe_tests.root_module.linkLibrary(net);
 

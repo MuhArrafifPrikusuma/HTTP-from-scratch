@@ -1,6 +1,6 @@
 const std = @import("std");
 const lib = @import("common.zig");
-const net = @import("net.zig");
+const net = @import("common.zig");
 
 const c = @cImport({
     @cInclude("../include/common.h");
@@ -37,8 +37,8 @@ pub fn Reader(fd: c_int, from_addr: lib.Cstring, ioptr: *anyopaque) !*anyopaque 
     std.debug.print("time: {any}\n", .{std.Io.Clock.now(std.Io.Clock.real, io.*)});
 
     try stdout.print(
-        "{s}read: {d} Bytes\nfrom: {s}\nContent:\n{s}",
-        .{ c.COLOR_BLUE, bytes_read, from_addr, c.COLOR_RESET },
+        "{s}read: {d} Bytes\nfrom: {s}\nContent:\n{s}{s}",
+        .{ c.COLOR_BLUE, bytes_read, from_addr, c.COLOR_RESET, ctx.readBuffer },
     );
 
     try stdout.flush();
@@ -46,17 +46,17 @@ pub fn Reader(fd: c_int, from_addr: lib.Cstring, ioptr: *anyopaque) !*anyopaque 
 
     return request;
 }
-//
+
 // pub fn Writer(fd: c_int, to_addr: lib.Cstring, requestPtrFromC: *anyopaque) !void {
 //     const request: *lib.Parse.HttpTemplate = @ptrCast(@alignCast(requestPtrFromC));
 //     defer request.deinit();
 // }
 // fn handleGET(req_line: *lib.Parse.Line, request: *lib.Parse.HttpTemplate) !void {}
-
+//
 // fn determineRequest(request: *lib.Parse.HttpTemplate) !void {
 //     const req_line_unparsed = request.routing.RequestLine orelse return ServerErr.RequestLineIsRequired;
 //     var requestLine_buffer: lib.Parse.Line = .{};
-//     lib.Parse.parseRLine(&requestLine_buffer, req_line_unparsed);
+//     try lib.Parse.parseRLine(&requestLine_buffer, req_line_unparsed);
 //
 //     switch (requestLine_buffer.method) {
 //         lib.Parse.Methods.GET => handleGET(&requestLine_buffer, request),

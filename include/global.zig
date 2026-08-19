@@ -1,5 +1,5 @@
 const std = @import("std");
-const net = @import("library/net.zig");
+const net = @import("library/common.zig");
 const api = @import("api.zig");
 const c = @cImport({
     @cInclude("server.h");

@@ -105,11 +105,6 @@ pub fn parseHTTP(bytesPtr: *anyopaque, io: *const std.Io) !*HttpTemplate {
     _ = io;
 
     parser.splitPayload(bytes.readBuffer, request) catch |err| std.debug.print("{any}\n", .{err});
-    var lineBuf: Line = .{};
-    try parser.parseRLine(&lineBuf, request.routing.RequestLine);
-    std.debug.print("[DEBUG]line method: {any}\n", .{lineBuf.method.?});
-    std.debug.print("[DEBUG]ver: {s}\n", .{lineBuf.ver.?});
-    std.debug.print("[DEBUG]path: {s}\n", .{lineBuf.path.?});
 
     return request;
 }

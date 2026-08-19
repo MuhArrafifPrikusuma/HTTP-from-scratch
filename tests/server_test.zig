@@ -1,4 +1,5 @@
 const std = @import("std");
+const net = @import("net");
 const c = @cImport({
     @cInclude("../server/server.h");
 });
