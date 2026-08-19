@@ -38,7 +38,7 @@ export fn eReader(fd: c_int, from_addr: Cstring, ioptr: *anyopaque) ?*anyopaque 
     return ptr;
 }
 
-const ResponseStatus = struct {
+pub const ResponseStatus: struct {
     // success
     OK: []const u8 = "200 OK",
     Created: []const u8 = "201 Created",
@@ -47,42 +47,70 @@ const ResponseStatus = struct {
     NotFound: []const u8 = "404 Not Found",
     // server error
     InternalServerError: []const u8 = "500 Internal Server Error",
-};
+} = .{};
 
 pub const ResponseWriter = struct {
     requestLine: Parse.Line = .{},
-    Http: Parse.HttpTemplate = .{},
-    body: []const u8 = 0,
+    Http: Parse.HttpTemplate = .init(std.heap.smp_allocator),
 
-    pub fn WriterStatus(self: *@This(), status: ResponseStatus) !void {
+    pub fn WriterStatus(self: *ResponseWriter, status: ResponseStatus, allocator: std.mem.Allocator) !void {
         var buf: [256]u8 = undefined;
-        const result = std.fmt.bufPrint(&buf, "HTTP/1.1 {s}\r\n", .{status});
+        const result = try std.fmt.bufPrint(&buf, "HTTP/1.1 {s}\r\n", .{status});
+        self.Http.routing.Connection = try allocator.dupe(u8, "Connection: keep-alive\r\n");
+        self.Http.payload.ContentType = try allocator.dupe(u8, "Content-Type: none\r\n");
+        self.Http.payload.ContentLength = try allocator.dupe(u8, "Content-Length: 0\r\n");
         self.requestLine.status = result;
     }
 
-    pub fn WriteContentType(self: *@This(), ContentType: []const u8) !void {
+    pub fn WriteContentType(self: *ResponseWriter, ContentType: []const u8, allocator: std.mem.Allocator) !void {
         var buf: [256]u8 = undefined;
-        const result = std.fmt.bufPrint(&buf, "Content-Type: {s}", .{ContentType});
-        self.Http.payload.ContentType = result;
+        const result = try std.fmt.bufPrint(&buf, "Content-Type: {s}\r\n", .{ContentType});
+        self.Http.payload.ContentType = try allocator.dupe(u8, result);
     }
 
-    pub fn WriteAll(self: *@This()) !void {
+    pub fn WriteBody(self: *ResponseWriter, body: []const u8, allocator: std.mem.Allocator) !void {
+        self.Http.body = body;
+        var buf: [256]u8 = undefined;
+        const result = try std.fmt.bufPrint(&buf, "Content-Length: {s}\r\n", .{body.len});
+        self.Http.payload.ContentLength = try allocator.dupe(u8, result);
+    }
+
+    /// format all that has been written and then return the slice of http response
+    pub fn FormatHttp(self: *ResponseWriter) ![]const u8 {
         const allocator = std.heap.smp_allocator;
         var response: std.ArrayList(u8) = .empty;
         defer response.deinit(allocator);
+        defer self.Http.deinit();
 
         // make header
         if (self.requestLine.status != null)
             try response.appendSlice(allocator, self.requestLine.status.?);
+
         if (self.Http.date != null)
             try response.appendSlice(allocator, self.Http.date.?);
+
+        if (self.Http.payload.ContentType != null)
+            try response.appendSlice(allocator, self.Http.payload.ContentType.?);
+        if (self.Http.payload.ContentLength != null)
+            try response.appendSlice(allocator, self.Http.payload.ContentLength.?);
+
+        if (self.Http.routing.Connection != null)
+            try response.appendSlice(allocator, self.Http.routing.Connection.?);
+
+        try response.appendSlice(allocator, "\r\n");
+        if (self.Http.body != null)
+            try response.appendSlice(allocator, self.Http.body.?);
+
+        return response.items;
     }
 };
 
+// NOTE: the one above gave a pointer to this one below and this one below fill the buffer from one above
+// i mean the api function
 pub fn handleFunc(
     method: Parse.Methods,
     path: []const u8,
-    func: *const fn (w: *ResponseWriter, r: *Parse.HttpTemplate) void,
+    func: *const fn (w: *ResponseWriter, r: *Parse.HttpTemplate, allocator: std.mem.Allocator) anyerror!void,
 ) void {
     switch (method) {
         .GET => {

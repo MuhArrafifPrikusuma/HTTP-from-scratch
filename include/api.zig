@@ -6,11 +6,12 @@ pub fn start() void {
     net.handleFunc(net.Method.GET, "/no", serveIndex1);
 }
 
-fn serveIndex(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate) void {
-    _ = w;
+fn serveIndex(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate, allocator: std.mem.Allocator) !void {
+    try w.WriteContentType("text/html", allocator);
+    try w.WriteBody("hello browser\n", allocator);
     _ = r;
 }
-fn serveIndex1(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate) void {
-    _ = w;
+fn serveIndex1(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate, allocator: std.mem.Allocator) !void {
+    try w.WriteContentType("text/html", allocator);
     _ = r;
 }

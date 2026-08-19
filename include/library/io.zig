@@ -13,7 +13,7 @@ const ServerErr = error{
 // comptime variable to determine path and method for user API
 const Routing = struct {
     path: [20]?[]const u8 = @splat(null),
-    func: [20]?*const fn (w: *net.ResponseWriter, r: *net.Parse.HttpTemplate) void = @splat(null),
+    func: [20]?*const fn (w: *net.ResponseWriter, r: *net.Parse.HttpTemplate, allocator: std.mem.Allocator) anyerror!void = @splat(null),
 };
 
 pub var methGET: Routing = .{};
