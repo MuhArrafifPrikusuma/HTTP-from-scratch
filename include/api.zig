@@ -7,11 +7,14 @@ pub fn start() void {
 }
 
 fn serveIndex(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate, allocator: std.mem.Allocator) !void {
-    try w.WriteContentType("text/html", allocator);
-    try w.WriteBody("hello browser\n", allocator);
+    try w.WriterStatus("work", allocator);
+
+    try w.WriteBody("hello", allocator);
     _ = r;
 }
 fn serveIndex1(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate, allocator: std.mem.Allocator) !void {
     try w.WriteContentType("text/html", allocator);
+    try w.WriterStatus(net.ResponseStatus.OK, allocator);
+    try w.WriteBody("yes yes no\n", allocator);
     _ = r;
 }

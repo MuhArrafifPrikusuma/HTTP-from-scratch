@@ -50,10 +50,12 @@ pub const ResponseStatus: struct {
 } = .{};
 
 pub const ResponseWriter = struct {
-    requestLine: Parse.Line = .{},
-    Http: Parse.HttpTemplate = .init(std.heap.smp_allocator),
+    // make this heap allocaated inside HttpTemplate later
+    requestLine: *Parse.Line = undefined,
+    // initiate this on the main run function later
+    Http: *Parse.HttpTemplate = undefined,
 
-    pub fn WriterStatus(self: *ResponseWriter, status: ResponseStatus, allocator: std.mem.Allocator) !void {
+    pub fn WriterStatus(self: *ResponseWriter, status: []const u8, allocator: std.mem.Allocator) !void {
         var buf: [256]u8 = undefined;
         const result = try std.fmt.bufPrint(&buf, "HTTP/1.1 {s}\r\n", .{status});
         self.Http.routing.Connection = try allocator.dupe(u8, "Connection: keep-alive\r\n");
@@ -71,7 +73,7 @@ pub const ResponseWriter = struct {
     pub fn WriteBody(self: *ResponseWriter, body: []const u8, allocator: std.mem.Allocator) !void {
         self.Http.body = body;
         var buf: [256]u8 = undefined;
-        const result = try std.fmt.bufPrint(&buf, "Content-Length: {s}\r\n", .{body.len});
+        const result = try std.fmt.bufPrint(&buf, "Content-Length: {d}\r\n", .{body.len});
         self.Http.payload.ContentLength = try allocator.dupe(u8, result);
     }
 
@@ -84,7 +86,7 @@ pub const ResponseWriter = struct {
 
         // make header
         if (self.requestLine.status != null)
-            try response.appendSlice(allocator, self.requestLine.status.?);
+            std.debug.print("test\n", .{});
 
         if (self.Http.date != null)
             try response.appendSlice(allocator, self.Http.date.?);

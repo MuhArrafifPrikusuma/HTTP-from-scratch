@@ -37,14 +37,49 @@ pub fn Reader(fd: c_int, from_addr: lib.Cstring, ioptr: *anyopaque) !*anyopaque 
     std.debug.print("time: {any}\n", .{std.Io.Clock.now(std.Io.Clock.real, io.*)});
 
     try stdout.print(
-        "{s}read: {d} Bytes\nfrom: {s}\nContent:\n{s}{s}",
-        .{ c.COLOR_BLUE, bytes_read, from_addr, c.COLOR_RESET, ctx.readBuffer },
+        "{s}read: {d} Bytes\nfrom: {s}\nContent:\n{s}",
+        .{ c.COLOR_BLUE, bytes_read, from_addr, c.COLOR_RESET },
     );
 
     try stdout.flush();
     const request = try lib.Parse.parseHTTP(ctx, io);
+    GetHandler(request);
 
     return request;
+}
+
+fn GetHandler(request: *lib.Parse.HttpTemplate) void {
+    const httpResponse = lib.Parse.HttpTemplate.init(std.heap.smp_allocator) catch |err| {
+        std.debug.print("{any}\n", .{err});
+        return;
+    };
+
+    var lineBuf: lib.Parse.Line = undefined;
+    lib.Parse.parseRLine(&lineBuf, request.routing.RequestLine) catch |err| {
+        std.debug.print("{any}\n", .{err});
+        return;
+    };
+
+    var writer: lib.ResponseWriter = .{ .Http = httpResponse };
+    const allocator = writer.Http.arena.allocator();
+
+    for (methGET.path, 0..) |path, i| {
+        if (path == null) continue;
+
+        if (std.ascii.eqlIgnoreCase(path.?, lineBuf.path.?)) {
+            if (methGET.func[i]) |func| {
+                func(&writer, request, allocator) catch |err| std.debug.print("{any}\n", .{err});
+            } else {
+                std.debug.print("no function found in: {s}\n", .{methGET.path[i].?});
+            }
+        }
+    }
+
+    const response = writer.FormatHttp() catch |err| {
+        std.debug.print("{any}\n", .{err});
+        return;
+    };
+    std.debug.print("response: \n{s}\n", .{response});
 }
 
 // pub fn Writer(fd: c_int, to_addr: lib.Cstring, requestPtrFromC: *anyopaque) !void {
