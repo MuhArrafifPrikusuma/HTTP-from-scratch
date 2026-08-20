@@ -1,6 +1,6 @@
 const std = @import("std");
-const lib = @import("common.zig");
 const net = @import("common.zig");
+const Io = @This();
 
 const c = @cImport({
     @cInclude("../include/common.h");
@@ -21,20 +21,18 @@ pub var methPOST: Routing = .{};
 pub var methPUT: Routing = .{};
 pub var methDELETE: Routing = .{};
 
-pub fn Reader(fd: c_int, from_addr: lib.Cstring, ioptr: *anyopaque) !*anyopaque {
+pub fn Reader(fd: c_int, from_addr: net.Cstring, ioptr: *anyopaque) !*anyopaque {
     const io: *std.Io = @ptrCast(@alignCast(ioptr));
 
     var bufout: [c.MAX_READ]u8 = undefined;
     var writer = std.Io.File.stdout().writer(io.*, &bufout);
     const stdout: *std.Io.Writer = &writer.interface;
 
-    var ctx = try lib.ReadContext.init(std.heap.smp_allocator);
+    var ctx = try net.ReadContext.init(std.heap.smp_allocator);
     const allocator = ctx.arena.allocator();
 
     const bytes_read: usize = @intCast(c.read(fd, &ctx.buffer[0], c.MAX_READ));
     ctx.readBuffer = try allocator.dupe(u8, ctx.buffer[0..bytes_read]);
-
-    std.debug.print("time: {any}\n", .{std.Io.Clock.now(std.Io.Clock.real, io.*)});
 
     try stdout.print(
         "{s}read: {d} Bytes\nfrom: {s}\nContent:\n{s}",
@@ -42,25 +40,26 @@ pub fn Reader(fd: c_int, from_addr: lib.Cstring, ioptr: *anyopaque) !*anyopaque 
     );
 
     try stdout.flush();
-    const request = try lib.Parse.parseHTTP(ctx, io);
-    GetHandler(request);
+    const request = try net.Parse.parseHTTP(ctx, io);
 
     return request;
 }
 
-fn GetHandler(request: *lib.Parse.HttpTemplate) void {
-    const httpResponse = lib.Parse.HttpTemplate.init(std.heap.smp_allocator) catch |err| {
+/// generate response based on user GET request
+fn handlerGET(request: *net.Parse.HttpTemplate, response: *std.ArrayList(u8), arrayAllocator: std.mem.Allocator) void {
+    const httpResponse = net.Parse.HttpTemplate.init(std.heap.smp_allocator) catch |err| {
         std.debug.print("{any}\n", .{err});
         return;
     };
 
-    var lineBuf: lib.Parse.Line = undefined;
-    lib.Parse.parseRLine(&lineBuf, request.routing.RequestLine) catch |err| {
+    // NOTE: move this to the caller(writer)  later
+    var lineBuf: net.Parse.Line = undefined;
+    net.Parse.parseRLine(&lineBuf, request.routing.RequestLine) catch |err| {
         std.debug.print("{any}\n", .{err});
         return;
     };
 
-    var writer: lib.ResponseWriter = .{ .Http = httpResponse };
+    var writer: net.ResponseWriter = .{ .Http = httpResponse };
     const allocator = writer.Http.arena.allocator();
 
     for (methGET.path, 0..) |path, i| {
@@ -75,26 +74,30 @@ fn GetHandler(request: *lib.Parse.HttpTemplate) void {
         }
     }
 
-    const response = writer.FormatHttp() catch |err| {
+    // NOTE: also move this buffer to the caller
+    writer.FormatHttp(response, arrayAllocator) catch |err| {
         std.debug.print("{any}\n", .{err});
         return;
     };
-    std.debug.print("response: \n{s}\n", .{response});
 }
 
-// pub fn Writer(fd: c_int, to_addr: lib.Cstring, requestPtrFromC: *anyopaque) !void {
-//     const request: *lib.Parse.HttpTemplate = @ptrCast(@alignCast(requestPtrFromC));
-//     defer request.deinit();
-// }
-// fn handleGET(req_line: *lib.Parse.Line, request: *lib.Parse.HttpTemplate) !void {}
-//
-// fn determineRequest(request: *lib.Parse.HttpTemplate) !void {
-//     const req_line_unparsed = request.routing.RequestLine orelse return ServerErr.RequestLineIsRequired;
-//     var requestLine_buffer: lib.Parse.Line = .{};
-//     try lib.Parse.parseRLine(&requestLine_buffer, req_line_unparsed);
-//
-//     switch (requestLine_buffer.method) {
-//         lib.Parse.Methods.GET => handleGET(&requestLine_buffer, request),
-//         else => return ServerErr.UnknownRequest,
-//     }
-// }
+pub fn Writer(fd: c_int, to_addr: net.Cstring, requestPtrFromC: *anyopaque, ioptr: *anyopaque) !void {
+    const io: *std.Io = @ptrCast(@alignCast(ioptr));
+    const request: *net.Parse.HttpTemplate = @ptrCast(@alignCast(requestPtrFromC));
+    defer request.deinit();
+
+    var buffer: [1024]u8 = undefined;
+    var wOut = std.Io.File.stdout().writer(io.*, &buffer);
+    const stdout = &wOut.interface;
+
+    const allocator = std.heap.smp_allocator;
+    var response = std.ArrayList(u8).empty;
+    defer response.deinit(allocator);
+
+    // NOTE: move handle get to another function later too
+    Io.handlerGET(request, &response, allocator);
+
+    const bytes_send: usize = @intCast(c.write(fd, &response.items[0], response.items.len));
+    try stdout.print("send {d}Bytes of data to: fd{d}:{s}\n", .{ bytes_send, fd, to_addr });
+    try stdout.flush();
+}

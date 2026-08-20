@@ -38,6 +38,12 @@ export fn eReader(fd: c_int, from_addr: Cstring, ioptr: *anyopaque) ?*anyopaque 
     return ptr;
 }
 
+export fn eWriter(fd: c_int, to_addr: Cstring, requestPtrFromC: *anyopaque, ioptr: *anyopaque) void {
+    Io.Writer(fd, to_addr, requestPtrFromC, ioptr) catch |err| {
+        std.debug.print("failed to write data {any}\n", .{err});
+    };
+}
+
 pub const ResponseStatus: struct {
     // success
     OK: []const u8 = "200 OK",
@@ -51,17 +57,16 @@ pub const ResponseStatus: struct {
 
 pub const ResponseWriter = struct {
     // make this heap allocaated inside HttpTemplate later
-    requestLine: *Parse.Line = undefined,
     // initiate this on the main run function later
     Http: *Parse.HttpTemplate = undefined,
 
     pub fn WriterStatus(self: *ResponseWriter, status: []const u8, allocator: std.mem.Allocator) !void {
         var buf: [256]u8 = undefined;
         const result = try std.fmt.bufPrint(&buf, "HTTP/1.1 {s}\r\n", .{status});
+        self.Http.r_line.status = try allocator.dupe(u8, result);
         self.Http.routing.Connection = try allocator.dupe(u8, "Connection: keep-alive\r\n");
         self.Http.payload.ContentType = try allocator.dupe(u8, "Content-Type: none\r\n");
         self.Http.payload.ContentLength = try allocator.dupe(u8, "Content-Length: 0\r\n");
-        self.requestLine.status = result;
     }
 
     pub fn WriteContentType(self: *ResponseWriter, ContentType: []const u8, allocator: std.mem.Allocator) !void {
@@ -78,32 +83,18 @@ pub const ResponseWriter = struct {
     }
 
     /// format all that has been written and then return the slice of http response
-    pub fn FormatHttp(self: *ResponseWriter) ![]const u8 {
-        const allocator = std.heap.smp_allocator;
-        var response: std.ArrayList(u8) = .empty;
-        defer response.deinit(allocator);
+    pub fn FormatHttp(self: *ResponseWriter, response: *std.ArrayList(u8), allocator: std.mem.Allocator) !void {
         defer self.Http.deinit();
 
         // make header
-        if (self.requestLine.status != null)
-            std.debug.print("test\n", .{});
-
-        if (self.Http.date != null)
-            try response.appendSlice(allocator, self.Http.date.?);
-
-        if (self.Http.payload.ContentType != null)
-            try response.appendSlice(allocator, self.Http.payload.ContentType.?);
-        if (self.Http.payload.ContentLength != null)
-            try response.appendSlice(allocator, self.Http.payload.ContentLength.?);
-
-        if (self.Http.routing.Connection != null)
-            try response.appendSlice(allocator, self.Http.routing.Connection.?);
+        if (self.Http.r_line.status) |status| try response.appendSlice(allocator, status);
+        if (self.Http.date) |date| try response.appendSlice(allocator, date);
+        if (self.Http.payload.ContentType) |ct| try response.appendSlice(allocator, ct);
+        if (self.Http.payload.ContentLength) |cl| try response.appendSlice(allocator, cl);
+        if (self.Http.routing.Connection) |con| try response.appendSlice(allocator, con);
 
         try response.appendSlice(allocator, "\r\n");
-        if (self.Http.body != null)
-            try response.appendSlice(allocator, self.Http.body.?);
-
-        return response.items;
+        if (self.Http.body) |body| try response.appendSlice(allocator, body);
     }
 };
 

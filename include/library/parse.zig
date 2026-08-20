@@ -30,6 +30,7 @@ pub const ContentPayload = struct {
 };
 // after we parsed it store it here
 pub const HttpTemplate = struct {
+    r_line: Line = .{},
     routing: GeneralRouting = .{},
     client: ClientAgent = .{},
     auth: Auth = .{},
@@ -58,6 +59,7 @@ pub const HttpTemplate = struct {
             .auth = .{},
             .payload = .{},
             .routing = .{},
+            .r_line = .{},
         };
         return self;
     }
