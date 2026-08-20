@@ -1,7 +1,6 @@
 #ifndef SERVER_H
 #define SERVER_H
 #include "../include/common.h"
-#include "../include/library/common.h"
 
 #define MAX_BACKLOG 2000
 #define MAX_EVENTS 128

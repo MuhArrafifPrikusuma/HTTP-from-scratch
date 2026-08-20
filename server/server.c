@@ -1,4 +1,5 @@
 #include "server.h"
+#include "../include/library/common.h"
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -87,7 +88,7 @@ static EventFlags_t stripFlags(uint32_t *flags) {
   if (*flags & EPOLLRDHUP) {
     return HANG_UP;
   }
-  if (*flags & EPOLLOUT) {
+  if (*flags == EPOLLOUT) {
     *flags -= EPOLLOUT;
     return WRITE_READY;
   }
@@ -100,22 +101,15 @@ static EventFlags_t stripFlags(uint32_t *flags) {
 
 // make it later on so that it makes sure to read and send all of the data
 // without leaving anything
-static void Io_Writer(ConnectionContext *restrict ctx, void *io) {
-  (void)io;
+static void Io_Writer(ConnectionContext *ctx, void *io) {
 
-  ctx->write_buffer = "hello world!";
-  size_t bufSize = strlen(ctx->write_buffer);
-
-  if (bufSize > MAX_BUF_SIZE) {
-    ctx->write_bytes = -1;
+  if (ctx->request == NULL)
     return;
-  }
 
-  ctx->write_bytes = write(ctx->fd, ctx->write_buffer, bufSize);
-  printf("write %zu bytes with value of\n%s\n", ctx->write_bytes,
-         ctx->write_buffer);
+  printf("is here\n");
+  eWriter(ctx->fd, ctx->ipstr, ctx->request, io);
 }
-static void Io_Reader(ConnectionContext *restrict ctx, void *io) {
+static void Io_Reader(ConnectionContext *ctx, void *io) {
   // NOTE: free ctx->reader_context after write/ disconnect/ crash
   ctx->request = eReader(ctx->fd, ctx->ipstr, io);
 
