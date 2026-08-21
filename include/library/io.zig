@@ -46,15 +46,8 @@ pub fn Reader(fd: c_int, from_addr: net.Cstring, ioptr: *anyopaque) !*anyopaque 
 }
 
 /// generate response based on user GET request
-fn handlerGET(request: *net.Parse.HttpTemplate, response: *std.ArrayList(u8), arrayAllocator: std.mem.Allocator) void {
+fn handlerGET(request: *net.Parse.HttpTemplate, response: *std.ArrayList(u8), responseAlocator: std.mem.Allocator, req_path: []const u8) void {
     const httpResponse = net.Parse.HttpTemplate.init(std.heap.smp_allocator) catch |err| {
-        std.debug.print("{any}\n", .{err});
-        return;
-    };
-
-    // NOTE: move this to the caller(writer)  later
-    var lineBuf: net.Parse.Line = undefined;
-    net.Parse.parseRLine(&lineBuf, request.routing.RequestLine) catch |err| {
         std.debug.print("{any}\n", .{err});
         return;
     };
@@ -65,18 +58,45 @@ fn handlerGET(request: *net.Parse.HttpTemplate, response: *std.ArrayList(u8), ar
     for (methGET.path, 0..) |path, i| {
         if (path == null) continue;
 
-        if (std.ascii.eqlIgnoreCase(path.?, lineBuf.path.?)) {
+        if (std.ascii.eqlIgnoreCase(path.?, req_path)) {
             if (methGET.func[i]) |func| {
-                func(&writer, request, allocator) catch |err| std.debug.print("{any}\n", .{err});
+                func(&writer, request, allocator) catch |err| std.debug.print("handlerGET: {any}\n", .{err});
             } else {
                 std.debug.print("no function found in: {s}\n", .{methGET.path[i].?});
             }
         }
     }
 
-    // NOTE: also move this buffer to the caller
-    writer.FormatHttp(response, arrayAllocator) catch |err| {
+    writer.FormatHttp(response, responseAlocator) catch |err| {
         std.debug.print("{any}\n", .{err});
+        return;
+    };
+}
+
+// NOTE: this has to capture the body of the request and then do whatever the fuck the function said it to do
+fn handlerPOST(request: *net.Parse.HttpTemplate, response: *std.ArrayList(u8), responseAllocator: std.mem.Allocator, req_path: []const u8) void {
+    const httpResponse = net.Parse.HttpTemplate.init(std.heap.smp_allocator) catch |err| {
+        std.debug.print("handlerPOST: {any}\n", .{err});
+        return;
+    };
+
+    var writer: net.ResponseWriter = .{ .Http = httpResponse };
+    const allocator = writer.Http.arena.allocator();
+
+    for (methPOST.path, 0..) |path, i| {
+        if (path == null) continue;
+
+        if (std.ascii.eqlIgnoreCase(path.?, req_path)) {
+            if (methPOST.func[i]) |func| {
+                func(&writer, request, allocator) catch |err| std.debug.print("handlerPOST: {any}\n", .{err});
+            } else {
+                std.debug.print("no function found in: {s}\n", .{methPOST.path[i].?});
+            }
+        }
+    }
+
+    writer.FormatHttp(response, responseAllocator) catch |err| {
+        std.debug.print("handlerPOST: {any}\n", .{err});
         return;
     };
 }
@@ -94,10 +114,26 @@ pub fn Writer(fd: c_int, to_addr: net.Cstring, requestPtrFromC: *anyopaque, iopt
     var response = std.ArrayList(u8).empty;
     defer response.deinit(allocator);
 
-    // NOTE: move handle get to another function later too
-    Io.handlerGET(request, &response, allocator);
+    var lineBuf: net.Parse.Line = undefined;
+
+    doMethod(&lineBuf, request, &response, allocator);
 
     const bytes_send: usize = @intCast(c.write(fd, &response.items[0], response.items.len));
-    try stdout.print("send {d}Bytes of data to: fd{d}:{s}\n", .{ bytes_send, fd, to_addr });
+    try stdout.print("send {d}Bytes of data to: fd:{d}::{s}\n", .{ bytes_send, fd, to_addr });
     try stdout.flush();
+}
+
+fn doMethod(lineBuffer: *net.Parse.Line, request: *net.Parse.HttpTemplate, response: *std.ArrayList(u8), allocator: std.mem.Allocator) void {
+    net.Parse.parseRLine(lineBuffer, request.routing.RequestLine.?) catch |err|
+        std.debug.print("{any}\n", .{err});
+
+    if (lineBuffer.method) |method| {
+        switch (method) {
+            .GET => Io.handlerGET(request, response, allocator, lineBuffer.path.?),
+            .POST => Io.handlerPOST(request, response, allocator, lineBuffer.path.?),
+            else => std.debug.print("unknown method\n", .{}),
+        }
+    } else {
+        std.debug.print("no method found\n", .{});
+    }
 }

@@ -77,7 +77,7 @@ pub const ResponseWriter = struct {
 
     pub fn WriteBody(self: *ResponseWriter, body: []const u8, allocator: std.mem.Allocator) !void {
         self.Http.body = body;
-        var buf: [256]u8 = undefined;
+        var buf: [4096]u8 = undefined;
         const result = try std.fmt.bufPrint(&buf, "Content-Length: {d}\r\n", .{body.len});
         self.Http.payload.ContentLength = try allocator.dupe(u8, result);
     }
@@ -112,7 +112,18 @@ pub fn handleFunc(
                 if (Io.methGET.path[i] == null) {
                     Io.methGET.path[i] = path;
                     Io.methGET.func[i] = func;
-                    std.debug.print("{d}: {s}\n", .{ i, Io.methGET.path[i].? });
+                    std.debug.print("GET: {d}: {s}\n", .{ i, Io.methGET.path[i].? });
+                    break;
+                }
+            }
+        },
+        .POST => {
+            var i: u32 = 0;
+            while (true) : (i += 1) {
+                if (Io.methPOST.path[i] == null) {
+                    Io.methPOST.path[i] = path;
+                    Io.methPOST.func[i] = func;
+                    std.debug.print("POST: {d}: {s}\n", .{ i, Io.methPOST.path[i].? });
                     break;
                 }
             }

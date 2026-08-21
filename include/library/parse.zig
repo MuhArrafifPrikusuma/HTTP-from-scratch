@@ -349,7 +349,13 @@ fn getBody(slice: []const u8, delimiter: []const u8, request: *HttpTemplate) !vo
 
 /// return the index that matches your field extension
 /// you must declare the default field with no extension on index 0
-fn findExtension(slice: []const u8, comptime possibleValues: []const []const u8, comptime delimiter: []const u8, searchDepth: u8, comptime zeroAsFallback: bool) !i8 {
+fn findExtension(
+    slice: []const u8,
+    comptime possibleValues: []const []const u8,
+    comptime delimiter: []const u8,
+    searchDepth: u8,
+    comptime zeroAsFallback: bool,
+) !i8 {
     var iter = std.mem.splitAny(u8, slice, delimiter);
 
     var extension: []const u8 = undefined;
@@ -398,9 +404,6 @@ fn getContent(slice: []const u8) ParserErr!?[]const u8 {
 
     return content;
 }
-
-// NOTE: make 1 function to parse both request line and response line and return struct
-// specifically tailored to them
 
 pub fn parseRLine(lineBuffer: *Line, line: ?[]const u8) !void {
     const linestr = line orelse return;

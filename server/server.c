@@ -106,11 +106,10 @@ static void Io_Writer(ConnectionContext *ctx, void *io) {
   if (ctx->request == NULL)
     return;
 
-  printf("is here\n");
+  printf("is here\n"); // NOTE: remove later
   eWriter(ctx->fd, ctx->ipstr, ctx->request, io);
 }
 static void Io_Reader(ConnectionContext *ctx, void *io) {
-  // NOTE: free ctx->reader_context after write/ disconnect/ crash
   ctx->request = eReader(ctx->fd, ctx->ipstr, io);
 
   if (ctx->request == NULL)
