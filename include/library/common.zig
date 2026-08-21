@@ -77,7 +77,7 @@ pub const ResponseWriter = struct {
 
     pub fn WriteBody(self: *ResponseWriter, body: []const u8, allocator: std.mem.Allocator) !void {
         self.Http.body = body;
-        var buf: [256]u8 = undefined;
+        var buf: [4096]u8 = undefined;
         const result = try std.fmt.bufPrint(&buf, "Content-Length: {d}\r\n", .{body.len});
         self.Http.payload.ContentLength = try allocator.dupe(u8, result);
     }
