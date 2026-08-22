@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<script src="/node_modules/htmx.org/dist/htmx.min.js"></script>
+		<title>idk whatever</title>
+	</head>
+	<body>
+		<div>
+			<a href="index.html">back</a>
+
+			<form hx-post="/submit" hx-target="#response-message">
+				<input type="text" name="t" placeholder="input whatever" required>
+				<button type="submit">submit</button>
+			</form>
+			<p id="response-message"></p>
+			<button type="button" hx-get="/testpost" hx-target="#data">see list</button>
+
+			<ol id="data">
+			</ol>
+		</div>
+	</body>
+</html>
