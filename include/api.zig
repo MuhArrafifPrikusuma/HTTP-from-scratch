@@ -73,10 +73,14 @@ fn sendJavascript(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate, allocator:
 
 var tmp: std.ArrayList([]const u8) = .empty;
 fn takeFromPOST(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate, allocator: std.mem.Allocator) !void {
-    const body = r.body orelse "empty";
+    const tmpAllocator = std.heap.smp_allocator;
+    var split = std.mem.splitSequence(u8, r.body.?, "t=");
+    _ = split.next() orelse return error.NoBody;
+    const actual = split.next() orelse "";
+
+    const body = try tmpAllocator.dupe(u8, actual);
     var list = &tmp;
 
-    const tmpAllocator = std.heap.smp_allocator;
     try list.append(tmpAllocator, body);
     for (tmp.items) |value| {
         std.debug.print("this is: {s}\n", .{value});
@@ -115,7 +119,7 @@ fn routeBack(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate, allocator: std.
     try w.WriteBody(index, allocator);
 }
 
-// FIX: this isn't supposed to do that there is definitely pointer missalignment here
+// FIX: this shit won't work if the first request is not exactly 4bytes
 fn sendDataToList(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate, allocator: std.mem.Allocator) !void {
     _ = r;
 
@@ -125,7 +129,12 @@ fn sendDataToList(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate, allocator:
     var bodyPtr = &body;
     var buf: [4096]u8 = undefined;
 
-    defer body.deinit(bodyAllocator);
+    defer {
+        for (body.items) |value| {
+            bodyAllocator.free(value);
+        }
+        body.deinit(bodyAllocator);
+    }
 
     std.debug.print("beforehand {s}\n", .{tmp.items[0]});
     // generate list
@@ -133,11 +142,14 @@ fn sendDataToList(w: *net.ResponseWriter, r: *net.Parse.HttpTemplate, allocator:
         std.debug.print("this function does ran; {s}\n", .{li});
         const formattedList = try std.fmt.bufPrint(&buf, "<li>{s}</li>", .{li});
         std.debug.print("{s}\n", .{formattedList});
-        try bodyPtr.append(bodyAllocator, formattedList);
+
+        const owned_str = try bodyAllocator.dupe(u8, formattedList);
+        try bodyPtr.append(bodyAllocator, owned_str);
+        std.debug.print("now it turns to {s}\n", .{body.items[0]});
     }
 
     const single_string = try std.mem.join(bodyAllocator, "\n", body.items);
-    std.debug.print("what is this: {s}\n", .{single_string});
+    std.debug.print("what is this: \n{s}\n", .{single_string});
     defer bodyAllocator.free(single_string);
 
     try w.WriterStatus(net.ResponseStatus.OK, allocator);
